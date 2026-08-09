@@ -21,6 +21,20 @@ import { UnsavedDialog } from './ui/dialogs/ConfirmDialog';
 import { ShortcutsDialog } from './ui/dialogs/ShortcutsDialog';
 import { ResizeDialog } from './ui/dialogs/ResizeDialog';
 import { ExportDialog } from './ui/dialogs/ExportDialog';
+import { ConnectRepoDialog } from './ui/dialogs/ConnectRepoDialog';
+import { SyncDialog } from './ui/dialogs/SyncDialog';
+import { SettingsDialog } from './ui/dialogs/SettingsDialog';
+import { SourcesSidebar } from './ui/SourcesSidebar';
+import { SaveAsDialog } from './ui/dialogs/SaveAsDialog';
+import { addJarSource, restoreJarSources } from './integrations/jar/jarSource';
+import {
+  addFolderSource,
+  folderSourcesSupported,
+  restoreFolderSources,
+} from './integrations/fsa/folderSource';
+import { restoreRepoSources } from './integrations/github/repoSource';
+import { listSources } from './integrations/sources';
+import { pickOpenFiles } from './integrations/fsa/localFile';
 import { useShortcuts, type ShortcutActions } from './ui/useShortcuts';
 import { deleteSelection, duplicateSelected } from './app/editActions';
 import {
@@ -32,18 +46,24 @@ import {
   pasteFromEvent,
 } from './app/selectionActions';
 
-type DialogId = 'new' | 'recover' | 'shortcuts' | 'resize' | 'export' | null;
+type DialogId =
+  'new' | 'recover' | 'shortcuts' | 'resize' | 'export' | 'repo' | 'settings' | 'saveAs' | null;
 
 export function App() {
   const [dialog, setDialog] = useState<DialogId>(null);
   const [closing, setClosing] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [syncSourceId, setSyncSourceId] = useState<string | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const hasDocs = useDocStore((s) => s.order.length > 0);
   const loaded = useSettingsStore((s) => s.loaded);
 
   useEffect(() => {
     void useSettingsStore.getState().load();
+    // Reconnect stored sources; none of these touch the network until browsed.
+    void restoreJarSources();
+    void restoreFolderSources();
+    void restoreRepoSources();
     const stop = startAutosave();
     void listAutosaves().then((l) => {
       if (l.length) setDialog('recover');
@@ -144,7 +164,13 @@ export function App() {
       newDoc: () => setDialog('new'),
       open: () => void openLocalFiles(),
       save: () => withActive((id) => void saveDoc(useDocStore.getState().docs[id])),
-      saveAs: () => withActive((id) => void saveDocAs(useDocStore.getState().docs[id])),
+      // With writable sources connected, Save As offers them; otherwise go straight to a file.
+      saveAs: () =>
+        withActive(() =>
+          listSources().some((s) => s.writable)
+            ? setDialog('saveAs')
+            : void saveDocAs(useDocStore.getState().active()!),
+        ),
       saveProject: () => withActive((id) => void saveProjectAs(useDocStore.getState().docs[id])),
       exportAs: () => setDialog('export'),
       recover: () => setDialog('recover'),
@@ -159,6 +185,32 @@ export function App() {
       duplicate: () => duplicateSelected(),
       resizeCanvas: () => setDialog('resize'),
       shortcutsHelp: () => setDialog('shortcuts'),
+      addJar: async () => {
+        const [file] = await pickOpenFiles(
+          [
+            {
+              description: 'Minecraft or mod jar',
+              accept: { 'application/java-archive': ['.jar', '.zip'] },
+            },
+          ],
+          false,
+        );
+        if (!file) return;
+        try {
+          const source = await addJarSource(file);
+          toast(`Added ${source.label}`, 'ok');
+        } catch {
+          toast(`${file.name} is not a readable jar or zip archive.`, 'error');
+        }
+      },
+      addFolder: async () => {
+        if (!folderSourcesSupported()) {
+          toast('Local folders need a Chromium browser (File System Access).', 'error');
+          return;
+        }
+        const source = await addFolderSource();
+        if (source) toast(`Added folder ${source.label}`, 'ok');
+      },
       about: () => toast('Monet — Paint 3D-style editor for Minecraft textures.'),
     }),
     [notYet, requestClose, withActive],
@@ -172,17 +224,30 @@ export function App() {
     <div className="app">
       <TopBar
         onMenu={() => setMenuOpen((v) => !v)}
-        onSettings={notYet('Settings')}
+        onSettings={() => setDialog('settings')}
         onExport={actions.exportAs}
-        onSync={notYet('Repository sync')}
+        onSync={() => {
+          const active = useDocStore.getState().active();
+          const bound = active?.binding
+            ? listSources().find((s) => s.id === active.binding!.sourceId && s.kind === 'repo')
+            : undefined;
+          const repo = bound ?? listSources().find((s) => s.kind === 'repo');
+          if (!repo) {
+            toast('Connect a GitHub repository first.', 'error');
+            return;
+          }
+          setSyncSourceId(repo.id);
+        }}
       />
       {menuOpen && <AppMenu actions={actions} onClose={() => setMenuOpen(false)} />}
 
       <div className="main">
-        <aside className="sources">
-          <div className="sources__header">Sources</div>
-          <div className="panel__todo">Coming in a later milestone.</div>
-        </aside>
+        <SourcesSidebar
+          onAddJar={() => void actions.addJar()}
+          onAddRepo={() => setDialog('repo')}
+          onAddFolder={() => void actions.addFolder()}
+          onSync={(id) => setSyncSourceId(id)}
+        />
 
         <section className="center">
           <DocTabs onNew={() => setDialog('new')} onClose={requestClose} />
@@ -208,6 +273,15 @@ export function App() {
       {dialog === 'shortcuts' && <ShortcutsDialog onClose={() => setDialog(null)} />}
       {dialog === 'resize' && <ResizeDialog onClose={() => setDialog(null)} />}
       {dialog === 'export' && <ExportDialog onClose={() => setDialog(null)} />}
+      {dialog === 'repo' && (
+        <ConnectRepoDialog
+          onClose={() => setDialog(null)}
+          onNeedToken={() => setDialog('settings')}
+        />
+      )}
+      {dialog === 'settings' && <SettingsDialog onClose={() => setDialog(null)} />}
+      {dialog === 'saveAs' && <SaveAsDialog onClose={() => setDialog(null)} />}
+      {syncSourceId && <SyncDialog sourceId={syncSourceId} onClose={() => setSyncSourceId(null)} />}
       {closingDoc && (
         <UnsavedDialog
           name={closingDoc.name}

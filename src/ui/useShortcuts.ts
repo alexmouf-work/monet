@@ -25,6 +25,8 @@ export interface ShortcutActions {
   duplicate(): void;
   resizeCanvas(): void;
   shortcutsHelp(): void;
+  addJar(): Promise<void> | void;
+  addFolder(): Promise<void> | void;
 }
 
 const TOOL_KEYS: Record<string, ToolId> = {

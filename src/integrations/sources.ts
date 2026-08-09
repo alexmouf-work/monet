@@ -15,6 +15,8 @@ export interface TextureNode {
   size?: number;
   /** True when a .monet project mirror exists for this texture (docs/08 §6.2). */
   hasProject?: boolean;
+  /** Jar textures with a sibling .mcmeta are animated strips (docs/08 §2). */
+  animated?: boolean;
 }
 
 export interface SourceProvider {

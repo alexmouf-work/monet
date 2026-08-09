@@ -980,3 +980,147 @@ select {
   border-color: var(--danger);
   outline: 1px solid var(--danger);
 }
+
+/* ---------- sources sidebar ---------- */
+
+.sources__add {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel-2);
+}
+
+.srcblock {
+  border-bottom: 1px solid var(--border);
+  padding: 6px 8px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 0;
+}
+
+.srcblock__head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.srcblock__toggle {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.srcblock__actions {
+  display: flex;
+  gap: 2px;
+}
+
+.srcblock__status,
+.srcblock__note {
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+.srcblock__note--error {
+  color: var(--danger);
+}
+
+.srcblock__filter {
+  width: 100%;
+  padding: 3px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.srctree {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+.srctree__item {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  width: 100%;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  padding: 2px 4px;
+  cursor: pointer;
+  text-align: left;
+  font-size: 11px;
+}
+
+.srctree__item:hover {
+  background: var(--accent-soft);
+}
+
+.srctree__name {
+  flex: none;
+  max-width: 55%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.srctree__path {
+  color: var(--text-dim);
+  font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+}
+
+.srctree__badge {
+  width: 6px;
+  height: 6px;
+  border-radius: 1px;
+  background: var(--accent);
+  flex: none;
+}
+
+/* ---------- notices ---------- */
+
+.notice {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 4px;
+  background: var(--panel);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.notice--error {
+  border-left-color: var(--danger);
+}
+
+.notice--ok {
+  border-left-color: var(--ok);
+}
+
+code {
+  font-family: ui-monospace, monospace;
+  background: var(--panel);
+  padding: 0 3px;
+  border-radius: 3px;
+}
+
+.srctree__badge--anim {
+  background: #d98324;
+  border-radius: 50%;
+}
