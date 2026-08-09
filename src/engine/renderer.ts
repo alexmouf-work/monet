@@ -6,6 +6,7 @@ import type { MonetDoc } from '../core/model/types';
 import { ctx2d, makeCanvas } from './layerCache';
 import { drawDocument, type ComposeOpts } from './compose';
 import type { View } from './viewport';
+import { themeColors } from './themeColors';
 
 export type GridMode = 'auto' | 'on' | 'off';
 
@@ -19,7 +20,6 @@ export interface Scene {
   overlay?: (ctx: CanvasRenderingContext2D, view: View) => void;
 }
 
-const SURROUND = '#3d3d40';
 // Light checkerboard (was #cfcfcf/#a8a8a8): a mid-grey pixel grid is invisible against a
 // mid-grey checker, and seeing pixel boundaries over transparency is the point of the grid.
 const CHECK_LIGHT = '#ffffff';
@@ -117,7 +117,7 @@ export class Renderer {
     const dpr = window.devicePixelRatio || 1;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.imageSmoothingEnabled = false;
-    ctx.fillStyle = SURROUND;
+    ctx.fillStyle = themeColors().surround;
     ctx.fillRect(0, 0, this.cssW, this.cssH);
 
     const { doc, view } = scene;

@@ -21,6 +21,9 @@ collaboration, any server component.
 | 2026-08-09 | GitHub integration via REST API + user-supplied fine-grained PAT; branch-per-repo default name `monet`; push on every save; Sync = ff-only ref update with merge-commit fallback; never force-push. |
 | 2026-08-09 | Repo governance: all work on `main`; small commits pushed promptly; progress docs updated before every commit, claude-readable-first (charter directives 1–3). |
 | 2026-08-09 | Hosting: **Vercel** (owner request, after the spec was written). Static output, no serverless functions — nothing in Monet needs a server. Deploys via Vercel's Git integration, not a GitHub Action. |
+| 2026-08-09 | UI density: **nothing needed while working may live only in a menu.** An always-visible toolbar row carries file/history/clipboard/canvas/view actions; the ☰ menu stays as a discoverable list of the same actions with their shortcuts. |
+| 2026-08-09 | The painting cursor stays **visible** — the brush tip outline supplements the system cursor rather than replacing it. |
+| 2026-08-09 | **Dark mode** is in scope (the spec had called theming out-of-scope polish): `system` / `light` / `dark`, default `system`, persisted, toggled from the toolbar. |
 | spec | Design decisions D1–D8 and vetoable assumptions A1–A8: `docs/00-overview.md` §1, §5. PDF fit interpretation (contain; long-edges coincide for aspect ≥ √2): `docs/07` §6. |
 
 ## Shipped
@@ -52,3 +55,5 @@ browser. See docs/ARCHITECTURE.md for the as-built map and ROADMAP.csv for per-m
 | 2026-08-09 | Checkerboard #cfcfcf/#a8a8a8 → **#ffffff/#d4d4d4**: the specced grey pixel grid was invisible against a mid-grey checker, which defeats the grid's purpose on transparent canvases. (docs/01 §4, docs/06 §2 updated) |
 | 2026-08-09 | PDF fit is **contain**, not a literal longest-edge match, so images squarer than the page are not cropped; identical to the literal rule for anything at least as elongated as A4. (docs/07 §6) |
 | 2026-08-09 | Deploy target: GitHub Pages workflow → **Vercel** (owner request). `.github/workflows/deploy.yml` deleted; `vercel.json` added. CI in `.github/` still lints/tests/builds. |
+| 2026-08-09 | "Light theme, hard-code the palette; theme work is polish, not v1 scope" (docs/09 preamble) → **superseded**: owner asked for a dark mode, so the palette is tokenised and there are three theme states. (docs/09 §9 rewritten) |
+| 2026-08-09 | Brushes' `cursor: none` → **`crosshair`** (owner request). The overlay outline is 1–2 px wide at low zoom, so hiding the pointer left nothing to track. (docs/02 §3.4, docs/09 §8) |

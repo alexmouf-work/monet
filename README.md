@@ -45,7 +45,8 @@ flips.
 
 **Everywhere** — scroll to zoom at the cursor, rectangular select with lift/move/
 anchor, clipboard, crop, flatten, undo/redo 200 deep, pixel grid, **3×3 tiling
-preview** for checking seams, autosave with crash recovery.
+preview** for checking seams, autosave with crash recovery, and a light/dark theme
+that follows your system by default.
 
 **Export** — PNG (default), JPEG, WebP, ICO (multi-size), BMP and PDF.
 

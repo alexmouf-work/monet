@@ -39,6 +39,7 @@ src/engine/                            DOM-facing rendering
   layerCache.ts                        layer id → canvas cache + imageDataFrom
   drawObjects.ts paths.ts textLayout.ts objectChrome.ts hitTest.ts
   viewport.ts exporters.ts
+  themeColors.ts                       cached --surround/--accent for canvas chrome
 
 src/tools/                             one module per tool over a common interface
   registry.ts index.ts types.ts        registration; unknown ids degrade to a no-op
@@ -50,6 +51,7 @@ src/app/                               stores + action layer
   bus.ts                               invalidate + toast fan-out
   fileActions exportActions editActions selectionActions canvasActions
   adjustSession.ts                     shared preview/bake for noise + recolour
+  themeMode.ts                         system|light|dark, data-theme stamping
   autosave.ts debugBridge.ts
 
 src/integrations/
@@ -60,7 +62,7 @@ src/integrations/
   idb.ts                               idb-keyval wrappers + autosave store
 
 src/ui/                                React; no business logic
-  App.tsx TopBar AppMenu DocTabs Workspace StatusBar OptionsPanel ColorPanel
+  App.tsx TopBar Toolbar AppMenu DocTabs Workspace StatusBar OptionsPanel ColorPanel
   SourcesSidebar TextEditOverlay UpdatePrompt sceneHooks useShortcuts fonts theme.css
   panels/{Brushes,Shapes,Text,Canvas,Noise,Recolour}Panel.tsx
   controls/{Slider,ColorField}.tsx
@@ -78,7 +80,12 @@ state back through `src/app/debugBridge.ts` (`window.__monet`: doc, stack, store
 `xvfb-run`. Scenarios assert on real pixels and store values, not on screenshots.
 
 Scenarios: `smoke` · `full` · `layering` (the owner's scenario) · `text` · `selection` ·
-`canvas` · `noise` · `recolour` · `export` · `save` · `sources` (GitHub against a mocked API).
+`canvas` · `noise` · `recolour` · `export` · `save` · `sources` (GitHub against a mocked API) ·
+`theme` (toolbar wiring, brush cursor, theme cycling + persistence).
+
+`shot()` waits two `requestAnimationFrame`s before capturing. A full-page screenshot taken
+immediately after a CSS-only change (a theme toggle) can otherwise return the *previous*
+compositor frame — which reads as "the feature is broken" when it is not (seen 2026-08-09).
 
 CI runs unit tests + build, not the harness or Playwright (no browser in the runner).
 
@@ -119,6 +126,13 @@ directory, so unknown paths correctly 404 instead.
 - **Checkerboard** lightened to `#ffffff`/`#d4d4d4` — docs/01 §4 step 3.
 - **Brushes keep a visible `crosshair` cursor** instead of `cursor: none` — docs/09 §8, owner
   directive 2026-08-09. The tip outline is an addition to the pointer, not a replacement.
+- **`ui/Toolbar.tsx` is a second chrome row** the spec's layout did not have — owner directive
+  2026-08-09 ("as few clicks away as possible"). It duplicates ☰-menu actions rather than
+  replacing them; docs/09 §1 updated.
+- **Theming is real, not "polish out of scope"** — docs/09 §9. `app/themeMode.ts` owns the
+  `data-theme` attribute and `engine/themeColors.ts` the renderer's cached copies. `themeMode`
+  lives in `app/`, not `ui/`, because `app/settingsStore.ts` calls it and `app` must not import
+  `ui` (the dependency rule in docs/01 §2).
 
 ## Invariants worth knowing before editing
 
@@ -142,3 +156,8 @@ directory, so unknown paths correctly 404 instead.
   previews outlive the pixels they were derived from.
 - The text editing overlay commits on a real outside click, not on blur: the pointer-up that
   places the text moves focus to `<body>`, and committing there would delete it.
+- **No chrome colour may exist only inside a `@media` or `[data-theme]` block.** Every token
+  needs its base definition on bare `:root`, or one theme state renders unstyled.
+- Anything the renderer paints from CSS goes through `themeColors()`; after changing the theme,
+  call `refreshThemeColors()` and `invalidate()` or the canvas keeps the old surround until the
+  next unrelated redraw.

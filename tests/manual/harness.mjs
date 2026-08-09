@@ -81,6 +81,14 @@ const shots = [];
 const shot = async (label = `step-${shotIndex}`) => {
   const name = `${String(++shotIndex).padStart(2, '0')}-${label.replace(/[^\w.-]+/g, '-')}.png`;
   const file = path.join(outDir, name);
+  // Wait for a committed frame first: a full-page capture taken straight after a CSS-only
+  // change (a theme toggle, say) can otherwise return the previous compositor frame and make
+  // a correct app look broken.
+  await page
+    .evaluate(
+      () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+    )
+    .catch(() => {});
   await page.screenshot({ path: file });
   shots.push({ label, file });
   console.log(`  shot ${name}`);

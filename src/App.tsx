@@ -10,6 +10,7 @@ import { selectAll } from './tools/marquee';
 import { isTypingTarget } from './ui/Workspace';
 import './tools';
 import { TopBar } from './ui/TopBar';
+import { Toolbar } from './ui/Toolbar';
 import { AppMenu, type MenuActions } from './ui/AppMenu';
 import { DocTabs } from './ui/DocTabs';
 import { Workspace } from './ui/Workspace';
@@ -27,6 +28,7 @@ import { SettingsDialog } from './ui/dialogs/SettingsDialog';
 import { SourcesSidebar } from './ui/SourcesSidebar';
 import { SaveAsDialog } from './ui/dialogs/SaveAsDialog';
 import { UpdatePrompt } from './ui/UpdatePrompt';
+import { watchSystemTheme } from './app/themeMode';
 import { addJarSource, restoreJarSources } from './integrations/jar/jarSource';
 import {
   addFolderSource,
@@ -89,6 +91,8 @@ export function App() {
     );
     return unsub;
   }, []);
+
+  useEffect(() => watchSystemTheme(() => useSettingsStore.getState().theme), []);
 
   useEffect(
     () =>
@@ -241,6 +245,7 @@ export function App() {
         }}
       />
       {menuOpen && <AppMenu actions={actions} onClose={() => setMenuOpen(false)} />}
+      <Toolbar actions={actions} />
 
       <div className="main">
         <SourcesSidebar

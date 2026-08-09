@@ -55,6 +55,7 @@ monet/
       pointerRouter.ts        pointer events → active tool
       layerCache.ts           RasterLayer id → HTMLCanvasElement cache (§4)
       overlay.ts              grid, marquee ants, handles, brush cursor
+      themeColors.ts          cached CSS-variable chrome colours [09 §9]
     tools/                    one module per tool, common Tool interface (§8)
       select.ts pen.ts marker.ts eraser.ts bucket.ts eyedropper.ts
       shapeTool.ts textTool.ts panTool.ts
@@ -65,7 +66,7 @@ monet/
       fsa/folderSource.ts     File System Access source [08 §3]
       idb.ts                  idb-keyval wrappers, autosave [07 §9]
     ui/                       React components; no business logic
-      TopBar.tsx  FeatureTabs.tsx  OptionsPanel/…  SourcesSidebar/…
+      TopBar.tsx  Toolbar.tsx  FeatureTabs.tsx  OptionsPanel/…  SourcesSidebar/…
       StatusBar.tsx  ColorPanel.tsx  dialogs/…  theme.css
   tests/                      Vitest specs + golden files
   docs/                       this spec
@@ -185,7 +186,8 @@ something changed** (state mutation, pointer move with a tool, view change).
 Per frame, with `view = { zoom, panX, panY }` (§ [06 §6]) and DPR handled by sizing
 the canvas backing store to `cssSize × devicePixelRatio`:
 
-1. Clear; paint the **workspace surround** (neutral `#3d3d40`).
+1. Clear; paint the **workspace surround** — the themed `--surround`, read through
+   `engine/themeColors.ts` rather than as a literal [09 §9].
 2. Compute the doc→screen transform; `ctx.imageSmoothingEnabled = false` (always —
    nearest-neighbour at every zoom).
 3. **Checkerboard** for transparency, screen-space 8-px squares (`#ffffff`/`#d4d4d4`),
@@ -332,7 +334,8 @@ switches (it lives in the store), not reloads.
 { sources: SourceEntry[], addJar(), addFolder(), addRepo(), remove(), refresh() }
 
 // settingsStore  (persisted via idb-keyval; token in localStorage)
-{ lastDocSize, palette customs, defaultExport, pdfPageSize: 'A4', githubToken? }
+{ lastDocSize, palette customs, defaultExport, pdfPageSize: 'A4',
+  theme: 'system'|'light'|'dark' [09 §9], githubToken? }
 ```
 
 ## 8. Tool interface — `tools/`
@@ -340,7 +343,7 @@ switches (it lives in the store), not reloads.
 ```ts
 export interface Tool {
   id: ToolId;
-  cursor: string;                              // CSS cursor or 'none' (custom overlay)
+  cursor: string;                              // CSS cursor; brushes use 'crosshair' [09 §8]
   onPointerDown(e: ToolPointerEvent): void;    // e has doc-space float coords, buttons, mods
   onPointerMove(e: ToolPointerEvent): void;
   onPointerUp(e: ToolPointerEvent): void;

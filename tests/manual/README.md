@@ -45,6 +45,11 @@ up with no build step.
 | `save.mjs` | Ctrl+S routing: FSA handle, silent re-save, `.monet`, download fallback |
 | `sources.mjs` | jar browsing + the whole GitHub flow against a mocked `api.github.com` |
 | `canvas.mjs` `noise.mjs` `recolour.mjs` `export.mjs` | one per feature tab / format set |
+| `theme.mjs` | toolbar buttons actually fire, brush cursor is visible, theme cycles and persists |
+
+`shot()` deliberately waits two `requestAnimationFrame`s before capturing: a full-page
+screenshot taken straight after a CSS-only change can return the previous compositor frame, so a
+correct app looks broken. If a screenshot disagrees with `state()`, trust `state()`.
 
 ## Production output check
 

@@ -2,6 +2,7 @@
 import { create } from 'zustand';
 import { get as idbGet, set as idbSet } from 'idb-keyval';
 import type { Background, Hex } from '../core/model/types';
+import { applyThemeMode, type ThemeMode } from './themeMode';
 
 const KEY = 'monet.settings';
 export const TOKEN_KEY = 'monet.github.token';
@@ -20,12 +21,14 @@ interface Persisted {
   alpha: number;
   defaultExport: string;
   autosaveSeconds: number;
+  theme: ThemeMode;
 }
 
 interface SettingsState extends Persisted {
   loaded: boolean;
   load(): Promise<void>;
   setLastDoc(d: LastDoc): void;
+  setTheme(mode: ThemeMode): void;
   patch(p: Partial<Persisted>): void;
 }
 
@@ -37,6 +40,7 @@ const DEFAULTS: Persisted = {
   alpha: 1,
   defaultExport: 'png',
   autosaveSeconds: 30,
+  theme: 'system',
 };
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -49,6 +53,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     try {
       const stored = (await idbGet(KEY)) as Partial<Persisted> | undefined;
       if (stored) set({ ...stored });
+      applyThemeMode(get().theme);
     } catch {
       /* first run, or storage unavailable — defaults stand */
     }
@@ -57,6 +62,12 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 
   setLastDoc(d) {
     set({ lastDoc: d });
+    schedule(get);
+  },
+
+  setTheme(mode) {
+    set({ theme: mode });
+    applyThemeMode(mode);
     schedule(get);
   },
 
@@ -78,6 +89,7 @@ function schedule(get: () => SettingsState) {
       alpha: s.alpha,
       defaultExport: s.defaultExport,
       autosaveSeconds: s.autosaveSeconds,
+      theme: s.theme,
     };
     void idbSet(KEY, data).catch(() => undefined);
   }, 400);
