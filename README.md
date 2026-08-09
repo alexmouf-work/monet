@@ -25,6 +25,12 @@ to live at `monet.mouftools.com`.
 lives in [`docs/`](docs/) — start at [`docs/00-overview.md`](docs/00-overview.md).
 No application code exists yet.
 
+Live status and working rules (Claude-readable-first):
+[`CLAUDE.md`](CLAUDE.md) — agent charter ·
+[`docs/CONTEXT.md`](docs/CONTEXT.md) — durable decisions + shipped ·
+[`docs/ROADMAP.csv`](docs/ROADMAP.csv) — work items + status ·
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — as-built map.
+
 ## The spec, in reading order
 
 | Doc | Contents |
