@@ -1,1 +1,1 @@
-{"root":["./src/App.tsx","./src/main.tsx","./tests/smoke.test.ts","./tests/e2e/shell.spec.ts","./vite.config.ts","./vitest.config.ts","./playwright.config.ts"],"version":"5.9.3"}
+{"root":["./src/App.tsx","./src/main.tsx","./src/core/color/convert.ts","./src/core/model/commands.ts","./src/core/model/document.ts","./src/core/model/types.ts","./src/core/raster/pixels.ts","./tests/color.test.ts","./tests/pixels.test.ts","./tests/smoke.test.ts","./tests/e2e/shell.spec.ts","./vite.config.ts","./vitest.config.ts","./playwright.config.ts"],"version":"5.9.3"}
