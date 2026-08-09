@@ -90,6 +90,11 @@ the Vite preset and output directory and sets PWA-correct caching: hashed `/asse
 immutable for a year, but `sw.js`, `registerSW.js`, the workbox runtime, the manifest and
 `index.html` `must-revalidate`, or an updated service worker could never be picked up.
 
+`npm run check:vercel` (in CI) validates `vercel.json` with Vercel's own route parser
+(`@vercel/routing-utils`). `source` is **path-to-regexp, not raw regex** — a nested group like
+`/(a|b-(.*).js)` is rejected — and without the check that only shows up as a failed deploy,
+which is how it was first found (2026-08-09).
+
 **No catch-all rewrite on purpose.** Monet has no client-side routing, and `base: './'` keeps
 asset URLs relative (so a build also works from a subpath or `file://`). Rewriting an unknown
 nested path to `index.html` would make those relative URLs resolve against the wrong
