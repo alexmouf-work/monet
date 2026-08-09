@@ -5,22 +5,32 @@ after. Update it in the same commit as any architecture-affecting change. The
 *target* design lives in the numbered spec (`docs/01-architecture.md` et al.) — do
 not duplicate it here; describe reality and point.
 
-## Current state (2026-08-09)
-
-**No application code.** Repo = governance layer + v1 spec:
+## Current state (2026-08-09) — M0 scaffold
 
 ```
-CLAUDE.md            agent charter (branch/commit/progress-doc directives, project facts)
-README.md            public intro + spec index
-docs/00..10-*.md     the v1 specification (design contract)
-docs/CONTEXT.md      scope + durable decisions + shipped log
-docs/ROADMAP.csv     work items + status (S/G/M ids)
-docs/ARCHITECTURE.md this file
-.gitignore           node/vite/test artefacts (pre-created for M0)
+CLAUDE.md  README.md  docs/          governance + v1 spec (design contract)
+index.html                           SPA entry, mounts #root
+package.json                         deps per docs/01 §1; scripts below
+tsconfig.json                        strict, noEmit, react-jsx, types vite/client+node
+vite.config.ts                       app build (base './' for static hosting)
+vitest.config.ts                     unit tests, node env, plugin-free (see note)
+eslint.config.js  .prettierrc.json   lint/format
+playwright.config.ts                 e2e, chromium, builds+previews on :4173
+.github/workflows/ci.yml             format:check -> lint -> typecheck -> test -> build
+src/main.tsx  src/App.tsx            React entry + app shell
+src/ui/theme.css                     workspace palette tokens (docs/09 §9)
+tests/smoke.test.ts                  harness proof
+tests/e2e/shell.spec.ts              shell loads
 ```
 
-Next change to this file: M0 lands the Vite scaffold → record the real tree, build
-commands, and CI shape.
+Scripts: `dev` · `build` (tsc -b && vite build) · `preview` · `typecheck` · `lint` ·
+`format`/`format:check` · `test` (vitest run) · `test:watch` · `e2e`.
+
+Note: vitest 2 bundles vite 5, whose `Plugin` type is incompatible with vite 6's, so
+unit tests use a **separate plugin-free `vitest.config.ts`**. Legitimate because
+tests only cover `src/core` (pure TS, no JSX/DOM) per the docs/01 §2 dependency rule.
+
+Next: M1 — document model, compositor, viewport, doc tabs.
 
 ## Target shape (one-paragraph summary; authoritative detail in the spec)
 

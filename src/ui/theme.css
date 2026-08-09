@@ -1,0 +1,47 @@
+/* Monet workspace palette — docs/09 §9 */
+:root {
+  --surround: #3d3d40;
+  --panel: #f5f6f8;
+  --panel-2: #ffffff;
+  --border: #d9dce1;
+  --text: #1c1e21;
+  --text-dim: #6b7280;
+  --accent: #3fa7d6;
+  --accent-soft: #e4f2fa;
+  --danger: #d64545;
+  --ok: #2f9e44;
+  --topbar-h: 48px;
+  --status-h: 28px;
+  --tabs-h: 34px;
+  --sidebar-w: 280px;
+  --options-w: 300px;
+  font-family:
+    'Segoe UI',
+    system-ui,
+    -apple-system,
+    sans-serif;
+  font-size: 13px;
+  color: var(--text);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  background: var(--panel);
+}
+
+.app {
+  display: grid;
+  grid-template-rows: var(--topbar-h) 1fr var(--status-h);
+  height: 100%;
+}
