@@ -8,8 +8,10 @@ const executablePath = process.env.CHROME_PATH || undefined;
 const b = await chromium.launch({ executablePath });
 const p = await b.newPage({ viewport: { width: 1280, height: 800 } });
 const errs = [];
-p.on('console', m => { if (m.type() === 'error') errs.push(m.text()); });
-p.on('pageerror', e => errs.push('PAGEERROR: ' + e.message));
+p.on('console', (m) => {
+  if (m.type() === 'error') errs.push(m.text());
+});
+p.on('pageerror', (e) => errs.push('PAGEERROR: ' + e.message));
 await p.goto('http://127.0.0.1:4319/', { waitUntil: 'networkidle' });
 await p.click('.empty .btn--primary');
 await p.waitForSelector('dialog.dialog');
