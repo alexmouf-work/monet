@@ -921,3 +921,31 @@ kbd {
   text-transform: uppercase;
   font-variant-numeric: tabular-nums;
 }
+
+/* ---------- in-canvas text editing ---------- */
+
+.textedit {
+  position: absolute;
+  margin: 0;
+  padding: 0;
+  border: 1px dashed var(--accent);
+  background: transparent;
+  outline: none;
+  resize: none;
+  overflow: hidden;
+  white-space: pre;
+  caret-color: var(--accent);
+}
+
+.field-col {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+select {
+  padding: 3px 5px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel-2);
+}

@@ -169,9 +169,13 @@ pivots at the box centre).
 
 ### 6.2 Fonts
 
-- **Bundled** (woff2 in `src/assets/fonts/`, licensed OFL, preloaded via CSS
-  `@font-face` + `document.fonts.load` before first text render):
-  **Monocraft** (Minecraft-style, the default), **Press Start 2P**, **VT323**.
+- **Bundled** (OFL, installed as `@fontsource/*` packages and preloaded via
+  `document.fonts.load` before the first text render): **Silkscreen** (the default —
+  closest of the three to Minecraft's proportional pixel font and legible at 8px),
+  **Press Start 2P**, **VT323**.
+  (Corrected 2026-08-09: the original list named **Monocraft** as default, but it is not
+  published on npm and the build environment cannot fetch font binaries from GitHub. Adding
+  it later is one `@font-face` plus one entry in `src/ui/fonts.ts`.)
 - **Generic**: `sans-serif`, `serif`, `monospace`.
 - Stretch (Chromium): "Use system fonts…" button → `queryLocalFonts()` populates
   the dropdown; feature is hidden when the API is missing. Not required for done.

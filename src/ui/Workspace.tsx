@@ -9,6 +9,10 @@ import { docFromScreen, wheelFactor } from '../engine/viewport';
 import { getTool } from '../tools';
 import type { ToolPointerEvent } from '../tools/types';
 import { getComposeOpts, getOverlayPainter } from './sceneHooks';
+import { TextEditOverlay } from './TextEditOverlay';
+import { beginEditing } from '../tools/textTool';
+import { commitSplineNow, splineInProgress } from '../tools/shapeTool';
+import { selectedObject } from '../app/docStore';
 
 export function Workspace() {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -163,8 +167,18 @@ export function Workspace() {
               wheelFactor(e.deltaY),
             );
         }}
+        onDoubleClick={() => {
+          // Double-click finishes a spline, or re-opens a selected text object for editing.
+          if (splineInProgress()) {
+            commitSplineNow();
+            return;
+          }
+          const obj = selectedObject();
+          if (obj?.kind === 'text') beginEditing(obj.id);
+        }}
         onContextMenu={(e) => e.preventDefault()}
       />
+      <TextEditOverlay />
     </div>
   );
 }

@@ -6,6 +6,7 @@ import { bucketTool } from './bucketTool';
 import { eyedropperTool } from './eyedropperTool';
 import { selectTool } from './selectTool';
 import { shapeTool } from './shapeTool';
+import { textTool } from './textTool';
 
 registerTool(panTool);
 registerTool(penTool);
@@ -15,5 +16,6 @@ registerTool(bucketTool);
 registerTool(eyedropperTool);
 registerTool(selectTool);
 registerTool(shapeTool);
+registerTool(textTool);
 
 export { getTool, registerTool } from './registry';

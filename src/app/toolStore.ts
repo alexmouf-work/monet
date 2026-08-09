@@ -2,6 +2,7 @@
 import { create } from 'zustand';
 import type { Hex, ShapeType, TextAlign } from '../core/model/types';
 import { PAINT_PALETTE, pushRecent } from '../core/color/palette';
+import { DEFAULT_FONT } from '../ui/fonts';
 import { invalidate } from './bus';
 
 export type ToolId =
@@ -106,7 +107,7 @@ export const useToolStore = create<ToolState>((set, get) => ({
     crisp: true,
   },
   text: {
-    fontFamily: 'Monocraft',
+    fontFamily: DEFAULT_FONT,
     sizePx: 16,
     bold: false,
     italic: false,

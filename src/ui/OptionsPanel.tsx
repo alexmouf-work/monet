@@ -2,6 +2,7 @@
 import { useToolStore } from '../app/toolStore';
 import { BrushesPanel } from './panels/BrushesPanel';
 import { ShapesPanel } from './panels/ShapesPanel';
+import { TextPanel } from './panels/TextPanel';
 import { ColorPanel } from './ColorPanel';
 
 export function OptionsPanel() {
@@ -11,7 +12,8 @@ export function OptionsPanel() {
       <div className="options__scroll">
         {tab === 'brushes' && <BrushesPanel />}
         {tab === 'shapes' && <ShapesPanel />}
-        {tab !== 'brushes' && tab !== 'shapes' && (
+        {tab === 'text' && <TextPanel />}
+        {tab !== 'brushes' && tab !== 'shapes' && tab !== 'text' && (
           <div className="panel__todo">Coming in a later milestone.</div>
         )}
       </div>

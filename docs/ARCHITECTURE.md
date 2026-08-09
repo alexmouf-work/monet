@@ -56,7 +56,18 @@ tests only cover `src/core` (pure TS, no JSX/DOM) per the docs/01 §2 dependency
 - ImageData construction goes through `layerCache.imageDataFrom` (one deliberate cast at
   the DOM boundary).
 
-Next: M3 — colour panel, eyedropper, marker settings, bucket flood fill.
+### GUI harness (owner request 2026-08-09)
+
+`tests/manual/harness.mjs` + `harness.sh` drive the real app in a real browser, screenshot
+each step, build a **contact sheet** of the whole interaction, and read app state back out of
+the page through `src/app/debugBridge.ts` (`window.__monet`: document, stack, stores,
+`countColor`, `pixelAt`). Scenarios live in `tests/manual/scenarios/*.mjs`; full usage in
+`tests/manual/README.md`. `npm run harness`. Everything runs in one process because detached
+processes do not survive between agent shell calls; `--headed` wraps the run in `xvfb-run`.
+
+Assert on `state.*` (real pixels and real store values), not on screenshots.
+
+Next: M6 — selection lifecycle, clipboard, flatten.
 
 ## Target shape (one-paragraph summary; authoritative detail in the spec)
 
