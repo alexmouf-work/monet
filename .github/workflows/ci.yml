@@ -1,9 +1,13 @@
 name: CI
 
+# Manual only (owner directive 2026-08-09: Actions storage is full).
+#
+# Nothing here deploys — deploys come from Vercel's Git integration — and the same gates run
+# locally before every commit, so automatic runs bought little and cost storage on every push.
+# `cache: npm` is deliberately absent: each run wrote a fresh multi-hundred-MB cache entry.
+# Run it from the Actions tab when you want a clean-room check.
 on:
-  push:
-    branches: [main]
-  pull_request:
+  workflow_dispatch:
 
 jobs:
   check:
@@ -13,7 +17,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
       - run: npm ci
       - run: npm run format:check
       - run: npm run lint
