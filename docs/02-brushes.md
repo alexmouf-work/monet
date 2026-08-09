@@ -13,11 +13,19 @@ every control is in [09 §3.1].
   (pasting an 8-digit hex sets alpha too), an alpha slider 0–100 %, and an HSV
   picker (hue strip + SV square — implement with two canvases and pointer drags;
   maths via `color/convert.ts` [05 §2]).
-- **Eyedropper**: dedicated tool + `Alt`+click from any brush/shape tool. Picks the
-  **visual composite** colour (incl. objects & background) at the hovered pixel:
-  read from the renderer's last composite buffer. Left-click sets `{hex, alpha}`
-  (alpha from the composite pixel; over the checkerboard → alpha 0 with hex
-  unchanged). Escape/`Alt` release returns to the previous tool.
+- **Eyedropper**: lives in the **colour panel** (💧 next to the current swatch), not
+  in the Brushes tool grid — owner directive 2026-08-09, because the colour panel is
+  visible from every tab and picking is part of choosing a colour. Also `I`, and
+  `Alt`+click from any brush/shape tool. Picks the **visual composite** colour (incl.
+  objects & background) at the hovered pixel, read from the renderer's last composite
+  buffer (`activeRenderer().compositeSnapshot()` — never recomposite per event).
+  Left-click sets `{hex, alpha}` (alpha from the composite pixel; over the
+  checkerboard → alpha 0 with hex unchanged).
+- **Picking is momentary** (owner directive 2026-08-09): the previous tool comes back
+  on pointer-up, so a drag samples continuously and then hands the brush back. `Esc`
+  abandons an armed pick; `Alt` release does the same. Implemented with the tool
+  store's `pushTransient`/`popTransient`, so choosing the eyedropper as a persistent
+  tool (if ever re-added to a grid) would still stick.
 
 `core/color/convert.ts` must provide (unit-tested):
 `hexToRgb`, `rgbToHex`, `parseHexA` (8-digit), `rgbToHsl`, `hslToRgb`, `rgbToHsv`,

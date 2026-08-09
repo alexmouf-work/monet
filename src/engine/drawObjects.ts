@@ -49,6 +49,31 @@ function crispPass(
   target.globalAlpha = prev;
 }
 
+/**
+ * Paints overlapping geometry of one colour through a single blend. Drawing straight onto the
+ * target is only safe at full opacity — below that, anywhere two sub-paths overlap would blend
+ * twice and read as a darker seam.
+ */
+function singlePass(
+  target: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  alpha: number,
+  paint: (ctx: CanvasRenderingContext2D) => void,
+): void {
+  if (alpha <= 0) return;
+  if (alpha >= 1) {
+    paint(target);
+    return;
+  }
+  const s = scratch(w, h);
+  paint(s);
+  const prev = target.globalAlpha;
+  target.globalAlpha = alpha;
+  target.drawImage(s.canvas, 0, 0);
+  target.globalAlpha = prev;
+}
+
 export function shapePath(obj: ShapeObject): Path2D {
   return docPath(shapeContour(obj.shape, obj.points), obj.transform);
 }
@@ -67,19 +92,36 @@ export function drawShape(
     c.fillStyle = obj.fill.color;
     c.fill(path);
   };
-  const paintStroke = (c: CanvasRenderingContext2D) => {
-    c.strokeStyle = obj.stroke.color;
+  const strokeIn = (c: CanvasRenderingContext2D, color: string) => {
+    c.strokeStyle = color;
     c.lineWidth = Math.max(0.01, obj.stroke.width);
     c.lineJoin = 'miter';
     c.lineCap = 'butt';
     c.stroke(path);
   };
 
+  // The outline is always painted (docs/03 §2.4, owner directive 2026-08-09); switching it off
+  // only makes it the fill's colour. The footprint is then identical across the toggle, and an
+  // unfilled shape or a line with no outline stays visible instead of becoming an object you
+  // can select but not see.
+  if (!obj.stroke.enabled) {
+    // One colour, so one composite: painting fill and edge as separate passes would blend the
+    // boundary twice and leave a darker rim on anything below full opacity.
+    const paint = (c: CanvasRenderingContext2D) => {
+      if (obj.fill.enabled && fillable) paintFill(c);
+      strokeIn(c, obj.fill.color);
+    };
+    if (obj.crisp) crispPass(ctx, docW, docH, obj.fill.color, obj.fill.alpha, paint);
+    else singlePass(ctx, docW, docH, obj.fill.alpha, paint);
+    return;
+  }
+
   if (obj.crisp) {
     if (obj.fill.enabled && fillable)
       crispPass(ctx, docW, docH, obj.fill.color, obj.fill.alpha, paintFill);
-    if (obj.stroke.enabled)
-      crispPass(ctx, docW, docH, obj.stroke.color, obj.stroke.alpha, paintStroke);
+    crispPass(ctx, docW, docH, obj.stroke.color, obj.stroke.alpha, (c) =>
+      strokeIn(c, obj.stroke.color),
+    );
     return;
   }
 
@@ -88,10 +130,8 @@ export function drawShape(
     ctx.globalAlpha = obj.fill.alpha;
     paintFill(ctx);
   }
-  if (obj.stroke.enabled) {
-    ctx.globalAlpha = obj.stroke.alpha;
-    paintStroke(ctx);
-  }
+  ctx.globalAlpha = obj.stroke.alpha;
+  strokeIn(ctx, obj.stroke.color);
   ctx.restore();
 }
 

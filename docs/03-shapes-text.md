@@ -84,6 +84,22 @@ Options panel per selected object / next-to-create defaults:
 - **Fill**: enable checkbox, colour swatch (opens colour panel), **opacity 0–100 %**.
 - **Outline**: enable checkbox, colour swatch, **opacity 0–100 %**, **weight
   1–64 px** slider+numeric.
+
+#### 2.4 Outline disabled ≠ no outline (owner directive 2026-08-09)
+
+An outline is **always painted**. Unchecking *Outline* only switches its colour and
+opacity to the **fill's**, keeping the same weight — so:
+
+- the shape's footprint is identical whether the outline is on or off; the toggle
+  changes the edge's colour, never the geometry;
+- an edge that would otherwise be dropped by the crisp threshold stays solid;
+- a `line` (no fill) or a shape with *Fill* also off stays **visible** instead of
+  becoming an object you can select but not see.
+
+Same-colour fill and edge must composite as **one** pass at the fill's alpha
+(`drawObjects.singlePass`, and the single crisp pass): painting them separately
+blends the boundary twice and leaves a darker rim below full opacity. Hit-testing
+therefore always tests the stroke too (docs/03 §2.6 step 3).
 - **Crisp edges** checkbox (§5) — default **on** for docs ≤ 128 px short side,
   else off (per-object after creation).
 

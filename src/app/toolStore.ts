@@ -84,7 +84,12 @@ export const TAB_TOOL: Record<FeatureTab, ToolId | null> = {
   canvas: null,
 };
 
-export const BRUSH_TOOLS: ToolId[] = ['pen', 'marker', 'eraser', 'bucket', 'eyedropper'];
+/**
+ * The brushes tab's tool grid. The eyedropper is deliberately absent: it lives in the colour
+ * panel (owner directive 2026-08-09), which is visible from every tab, so picking a colour no
+ * longer means first navigating back to Brushes.
+ */
+export const BRUSH_TOOLS: ToolId[] = ['pen', 'marker', 'eraser', 'bucket'];
 
 /**
  * Anchoring lives in `app/selectionActions`, which imports this store — so reach it lazily to

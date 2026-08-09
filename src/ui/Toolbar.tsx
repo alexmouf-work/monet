@@ -29,8 +29,12 @@ export function Toolbar({ actions }: { actions: MenuActions }) {
   const hasDoc = useDocStore((s) => s.activeId !== null);
   const hasSelection = useDocStore((s) => s.selection !== null);
   const hasObject = useDocStore((s) => s.selectedObjectId !== null);
-  const undoDepth = useDocStore((s) => (s.activeId ? (s.histories[s.activeId]?.undo.length ?? 0) : 0));
-  const redoDepth = useDocStore((s) => (s.activeId ? (s.histories[s.activeId]?.redo.length ?? 0) : 0));
+  const undoDepth = useDocStore((s) =>
+    s.activeId ? (s.histories[s.activeId]?.undo.length ?? 0) : 0,
+  );
+  const redoDepth = useDocStore((s) =>
+    s.activeId ? (s.histories[s.activeId]?.redo.length ?? 0) : 0,
+  );
   const grid = useViewStore((s) => s.grid);
   const tiling = useViewStore((s) => s.tiling);
   const theme = useSettingsStore((s) => s.theme);

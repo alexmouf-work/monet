@@ -22,12 +22,12 @@ export function hitObject(doc: MonetDoc, p: Vec2, zoom: number): ObjectItem | nu
 
     const path = shapePath(item);
     if (item.fill.enabled && item.shape !== 'line' && c.isPointInPath(path, p.x, p.y)) return item;
-    if (item.stroke.enabled) {
-      c.lineWidth = Math.max(item.stroke.width, 6 / Math.max(zoom, 0.01));
-      if (c.isPointInStroke(path, p.x, p.y)) return item;
-    }
-    // An outline-less, fill-less object is still grabbable by its box.
-    if (!item.fill.enabled && !item.stroke.enabled) {
+    // The outline is painted whether or not it is enabled (docs/03 §2.4), so it is always a
+    // target — otherwise an outline-off shape could be seen but not clicked.
+    c.lineWidth = Math.max(item.stroke.width, 6 / Math.max(zoom, 0.01));
+    if (c.isPointInStroke(path, p.x, p.y)) return item;
+    // Nothing visible at all (no fill, and its colour fully transparent): grabbable by box.
+    if (!item.fill.enabled) {
       const l = localFromWorld(item.transform, p);
       if (l.x >= 0 && l.x <= 1 && l.y >= 0 && l.y <= 1) return item;
     }

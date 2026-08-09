@@ -164,6 +164,11 @@ export function useShortcuts(actions: ShortcutActions) {
           actions.del();
           return;
         case 'Escape':
+          // Give up on an armed pick before touching the selection.
+          if (ts.active === 'eyedropper' && ts.previous) {
+            ts.popTransient();
+            return;
+          }
           // A lifted float must be anchored, not dropped: its pixels were already cleared
           // from the layers, so discarding here would lose them (docs/06 §4.1 step 4).
           if (ds.selection?.floating) {
@@ -196,8 +201,15 @@ export function useShortcuts(actions: ShortcutActions) {
       }
 
       if (TOOL_KEYS[e.code]) {
-        ts.setTool(TOOL_KEYS[e.code]);
-        if (TOOL_KEYS[e.code] !== 'select' && TOOL_KEYS[e.code] !== 'pan') ts.setTab('brushes');
+        const id = TOOL_KEYS[e.code];
+        // `I` arms a momentary pick: sampling hands back to the previous tool on release,
+        // and it does not drag the Brushes tab along with it.
+        if (id === 'eyedropper') {
+          ts.pushTransient('eyedropper');
+          return;
+        }
+        ts.setTool(id);
+        if (id !== 'select' && id !== 'pan') ts.setTab('brushes');
         return;
       }
       if (TAB_KEYS[e.code]) ts.setTab(TAB_KEYS[e.code]);

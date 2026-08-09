@@ -860,6 +860,19 @@ kbd {
   border-radius: 4px;
 }
 
+/* The eyedropper's home (owner directive): reachable from every tab, next to the colour. */
+.colorpanel__pick {
+  align-self: stretch;
+  width: 30px;
+  font-size: 15px;
+}
+
+.colorpanel__pick.is-active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
 .colorpanel__fields {
   flex: 1;
   display: flex;

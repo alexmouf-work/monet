@@ -47,22 +47,24 @@ export function onPickArmChange(fn: () => void): () => void {
   };
 }
 
-function pick(e: ToolPointerEvent) {
+/** True while the pick came from a panel button or the `I` shortcut rather than Alt. */
+function pick(e: ToolPointerEvent): boolean {
   const hit = pickColorAt(e.doc.x, e.doc.y);
-  if (!hit) return;
+  if (!hit) return false;
   if (armedTarget) {
     const fn = armedTarget;
     armedTarget = null;
     fn(hit.hex);
     for (const l of armListeners) l();
     useToolStore.getState().popTransient();
-    return;
+    return true;
   }
   const ts = useToolStore.getState();
   // Fully transparent: keep the current hue, take the alpha.
   if (hit.alpha === 0) ts.setColor(ts.color, 0);
   else ts.setColor(hit.hex, hit.alpha);
   ts.commitRecent();
+  return true;
 }
 
 export const eyedropperTool: Tool = {
@@ -75,5 +77,15 @@ export const eyedropperTool: Tool = {
 
   onPointerMove(e) {
     if (e.buttons & 1) pick(e);
+  },
+
+  /**
+   * Sampling is a momentary action, not a mode (owner directive 2026-08-09): release the
+   * button and the previous tool comes back. Dragging still samples continuously, because the
+   * hand-back waits for pointer-up. `popTransient` no-ops when the eyedropper was chosen as a
+   * persistent tool, so that case still sticks.
+   */
+  onPointerUp() {
+    useToolStore.getState().popTransient();
   },
 };

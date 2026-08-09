@@ -23,6 +23,10 @@ collaboration, any server component.
 | 2026-08-09 | Hosting: **Vercel** (owner request, after the spec was written). Static output, no serverless functions — nothing in Monet needs a server. Deploys via Vercel's Git integration, not a GitHub Action. |
 | 2026-08-09 | UI density: **nothing needed while working may live only in a menu.** An always-visible toolbar row carries file/history/clipboard/canvas/view actions; the ☰ menu stays as a discoverable list of the same actions with their shortcuts. |
 | 2026-08-09 | The painting cursor stays **visible** — the brush tip outline supplements the system cursor rather than replacing it. |
+| 2026-08-09 | The **eyedropper belongs to the colour panel**, not the Brushes tool grid — it is a colour action and that panel is visible from every tab. |
+| 2026-08-09 | Picking a colour is **momentary**: the previous tool returns on release (via 💧, `I` or `Alt`). |
+| 2026-08-09 | **An outline is always drawn.** Unchecking *Outline* recolours it to the fill's colour/opacity at the same weight; it never removes geometry. |
+| 2026-08-09 | **Copy/paste covers objects**, not only pixel selections: a copied shape or text pastes back as a live, editable object. |
 | 2026-08-09 | **Dark mode** is in scope (the spec had called theming out-of-scope polish): `system` / `light` / `dark`, default `system`, persisted, toggled from the toolbar. |
 | spec | Design decisions D1–D8 and vetoable assumptions A1–A8: `docs/00-overview.md` §1, §5. PDF fit interpretation (contain; long-edges coincide for aspect ≥ √2): `docs/07` §6. |
 

@@ -21,6 +21,13 @@ export function ColorPanel() {
   const [hexText, setHexText] = useState(color);
   useEffect(() => setHexText(color), [color]);
 
+  // The eyedropper lives here, not in the Brushes tool grid (owner directive): the colour panel
+  // is visible from every tab, and picking is part of choosing a colour.
+  const activeTool = useToolStore((s) => s.active);
+  const pushTransient = useToolStore((s) => s.pushTransient);
+  const popTransient = useToolStore((s) => s.popTransient);
+  const picking = activeTool === 'eyedropper';
+
   const rgb = hexToRgb(color);
   const [h, s, v] = rgbToHsv(rgb.r, rgb.g, rgb.b);
   const [hue, setHue] = useState(h);
@@ -101,6 +108,18 @@ export function ColorPanel() {
           style={{ '--c': color, '--a': alpha } as React.CSSProperties}
           title={`${color} at ${Math.round(alpha * 100)}%`}
         />
+        <button
+          className={`iconbtn colorpanel__pick ${picking ? 'is-active' : ''}`}
+          onClick={() => (picking ? popTransient() : pushTransient('eyedropper'))}
+          title={
+            picking
+              ? 'Picking — click the canvas to sample (Esc cancels)'
+              : 'Pick a colour from the canvas (I, or hold Alt)'
+          }
+          aria-pressed={picking}
+        >
+          💧
+        </button>
         <div className="colorpanel__fields">
           <input
             className="colorpanel__hex"

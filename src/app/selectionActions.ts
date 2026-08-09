@@ -2,10 +2,15 @@
  * Selection lifecycle, clipboard, crop and flatten — docs/06 §4. Lives in `app` rather than
  * `core` because the selection is UI state (docStore) while the pixel edits are commands.
  */
-import type { MonetDoc, Rect } from '../core/model/types';
+import type { MonetDoc, ObjectItem, Rect } from '../core/model/types';
 import { isRaster } from '../core/model/types';
-import { SnapshotCommand, StrokeCommand } from '../core/model/commands';
-import { cloneDoc, ensureTopRasterLayer } from '../core/model/document';
+import {
+  AddItemCommand,
+  RemoveItemsCommand,
+  SnapshotCommand,
+  StrokeCommand,
+} from '../core/model/commands';
+import { cloneDoc, cloneItem, ensureTopRasterLayer } from '../core/model/document';
 import {
   blendRect,
   clampRect,
@@ -16,6 +21,7 @@ import {
 } from '../core/raster/pixels';
 import { resampleNearest } from '../core/raster/transform';
 import { compositePixels, renderComposite } from '../engine/compose';
+import { drawObject } from '../engine/drawObjects';
 import { canvasToBlob, decodeImage } from '../engine/exporters';
 import { ctx2d, imageDataFrom, makeCanvas } from '../engine/layerCache';
 import { toast } from './bus';
@@ -145,6 +151,68 @@ export const hasFloat = () => !!useDocStore.getState().selection?.floating;
 let internalClipboard: { pixels: Uint8ClampedArray; w: number; h: number } | null = null;
 
 /**
+ * A copied shape or text object, kept as an object so pasting recreates a live, still-editable
+ * item rather than pixels (owner request 2026-08-09). Set alongside `internalClipboard`, which
+ * holds the same thing rasterised for other applications.
+ */
+let objectClipboard: ObjectItem | null = null;
+
+/**
+ * Exactly the bytes this app last put on the system clipboard. Paste compares against it to
+ * tell "the PNG I wrote when copying a shape" from "an image the user copied elsewhere" — only
+ * the former should paste back as an object.
+ */
+let wroteToSystem: Uint8Array | null = null;
+
+async function sameAsOurCopy(blob: Blob): Promise<boolean> {
+  if (!wroteToSystem || blob.size !== wroteToSystem.length) return false;
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  for (let i = 0; i < bytes.length; i++) if (bytes[i] !== wroteToSystem[i]) return false;
+  return true;
+}
+
+/** The selected shape/text object, when there is one and no marquee is competing for the copy. */
+function selectedObjectForCopy(): ObjectItem | null {
+  const ds = useDocStore.getState();
+  if (ds.selection) return null;
+  const obj = ds.active()?.stack.find((i) => i.id === ds.selectedObjectId);
+  return obj && obj.kind !== 'raster' ? obj : null;
+}
+
+/** An object on its own, rasterised at document size and trimmed to what it covers. */
+function objectPixels(obj: ObjectItem): { pixels: Uint8ClampedArray; w: number; h: number } | null {
+  const doc = useDocStore.getState().active();
+  if (!doc) return null;
+  const canvas = makeCanvas(doc.width, doc.height);
+  const ctx = ctx2d(canvas);
+  ctx.imageSmoothingEnabled = false;
+  drawObject(ctx, obj, doc.width, doc.height);
+  const full = ctx.getImageData(0, 0, doc.width, doc.height).data;
+  const box = opaqueBounds(full, doc.width, doc.height);
+  if (!box) return null;
+  return { pixels: copyRect(full, doc.width, box), w: box.w, h: box.h };
+}
+
+/** Tight bounds of everything non-transparent, or null when the buffer is empty. */
+function opaqueBounds(px: Uint8ClampedArray, w: number, h: number): Rect | null {
+  let x0 = w;
+  let y0 = h;
+  let x1 = -1;
+  let y1 = -1;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (px[(y * w + x) * 4 + 3] === 0) continue;
+      if (x < x0) x0 = x;
+      if (y < y0) y0 = y;
+      if (x > x1) x1 = x;
+      if (y > y1) y1 = y;
+    }
+  }
+  if (x1 < 0) return null;
+  return { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
+}
+
+/**
  * The async clipboard can hang indefinitely rather than reject — it waits on a permission
  * prompt the user may never see (and headless browsers never show at all). Race it so the
  * internal clipboard fallback always gets its turn.
@@ -181,24 +249,39 @@ function toCanvas(px: Uint8ClampedArray, w: number, h: number): HTMLCanvasElemen
 }
 
 export async function copySelection(): Promise<void> {
-  const data = selectionPixels();
+  const obj = selectedObjectForCopy();
+  const data = obj ? objectPixels(obj) : selectionPixels();
   if (!data) {
-    toast('Nothing selected to copy.');
+    toast(obj ? 'That object has nothing visible to copy.' : 'Nothing selected to copy.');
     return;
   }
+  objectClipboard = obj ? cloneItem(obj) : null;
   internalClipboard = data;
+  wroteToSystem = null;
   try {
     const blob = await canvasToBlob(toCanvas(data.pixels, data.w, data.h), 'image/png');
     // System clipboard may refuse or stall; the internal copy above already succeeded.
-    await withTimeout(navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]));
+    const ok = await withTimeout(
+      navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]),
+    );
+    // Remember what we wrote so paste can recognise its own PNG and restore the live object.
+    if (ok !== null && objectClipboard) wroteToSystem = new Uint8Array(await blob.arrayBuffer());
   } catch {
     /* no system clipboard here */
   }
 }
 
 export async function cutSelection(): Promise<void> {
+  const obj = selectedObjectForCopy();
   await copySelection();
   const ds = useDocStore.getState();
+  const doc = ds.active();
+
+  if (obj && doc) {
+    ds.selectObject(null);
+    ds.execute(new RemoveItemsCommand('Cut object', doc, [obj.id]));
+    return;
+  }
   if (!ds.selection) return;
   if (!ds.selection.floating) liftSelection();
   // Discarding the lifted float leaves the cleared region behind: that is the cut.
@@ -207,18 +290,28 @@ export async function cutSelection(): Promise<void> {
 
 export async function pasteClipboard(): Promise<void> {
   let data = internalClipboard;
+  let object = objectClipboard;
   try {
     const items = navigator.clipboard?.read ? await withTimeout(navigator.clipboard.read()) : null;
     for (const item of items ?? []) {
       const type = item.types.find((t) => t.startsWith('image/'));
       if (!type) continue;
       const blob = await item.getType(type);
+      // Our own PNG still on the system clipboard: paste the live object it came from, not a
+      // flattened copy of it. Anything else outranks the internal clipboard.
+      if (object && (await sameAsOurCopy(blob))) break;
+      object = null;
       const decoded = await decodeImage(blob);
       data = { pixels: decoded.pixels, w: decoded.width, h: decoded.height };
       break;
     }
   } catch {
     // Fall back to the internal clipboard.
+  }
+
+  if (object) {
+    pasteObject(object);
+    return;
   }
   if (!data) {
     toast('Clipboard has no image to paste.');
@@ -258,6 +351,29 @@ export async function pasteClipboard(): Promise<void> {
   });
 }
 
+/**
+ * Insert a copied object on top of the stack, offset like Ctrl+D so the copy is visible rather
+ * than exactly hiding the original, and with its centre kept inside the canvas — the source
+ * document may have been larger than this one.
+ */
+function pasteObject(source: ObjectItem): void {
+  const ds = useDocStore.getState();
+  const doc = ds.active();
+  if (!doc) return;
+  anchorIfFloating();
+
+  const copy = cloneItem(source);
+  copy.id = doc.nextItemId;
+  doc.nextItemId += 1;
+  copy.transform = {
+    ...copy.transform,
+    cx: Math.max(0, Math.min(doc.width, copy.transform.cx + 8)),
+    cy: Math.max(0, Math.min(doc.height, copy.transform.cy + 8)),
+  };
+  ds.execute(new AddItemCommand('Paste object', copy, doc.stack.length));
+  ds.selectObject(copy.id);
+}
+
 /** Called from a paste event when the async clipboard API is unavailable. */
 export async function pasteFromEvent(e: ClipboardEvent): Promise<boolean> {
   const file = [...(e.clipboardData?.items ?? [])]
@@ -266,6 +382,9 @@ export async function pasteFromEvent(e: ClipboardEvent): Promise<boolean> {
   if (!file) return false;
   const decoded = await decodeImage(file);
   internalClipboard = { pixels: decoded.pixels, w: decoded.width, h: decoded.height };
+  // This image came from outside, so any object we were holding is no longer what to paste.
+  objectClipboard = null;
+  wroteToSystem = null;
   await pasteClipboard();
   return true;
 }

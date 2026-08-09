@@ -83,7 +83,9 @@ export function BrushesPanel() {
         />
       )}
 
-      <p className="panel__hint">Hold Alt with any tool to pick a colour from the canvas.</p>
+      <p className="panel__hint">
+        To pick a colour, use 💧 in the colour panel, press I, or hold Alt with any tool.
+      </p>
     </div>
   );
 }

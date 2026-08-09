@@ -144,7 +144,18 @@ interface SelectionState {
 - **Copy `Ctrl+C`** — rect (or float) → PNG via an offscreen →
   `navigator.clipboard.write([new ClipboardItem({'image/png': blob})])`, plus an
   internal in-memory copy (fallback when clipboard permissions fail).
-- **Cut `Ctrl+X`** — copy + lift-then-discard (one undo step).
+- **Objects copy too** (owner request 2026-08-09). With a shape or text object
+  selected and **no** marquee, copy/cut takes the *object*: an internal object
+  clipboard holds a `cloneItem`, so paste recreates a live, still-editable item
+  (`AddItemCommand`, `+8,+8` like Ctrl+D, centre clamped into the canvas, pasted item
+  selected) rather than pixels. The same copy is written to the system clipboard as a
+  PNG of the object's tight opaque bounds so other applications can paste it.
+  - Which one wins on paste: an image on the system clipboard normally outranks the
+    internal copy, **unless** its bytes are exactly the PNG this app last wrote — that
+    is our own copy coming back, and it must paste as the object. Compare bytes, not
+    just size; a `paste` event carrying an outside image clears the object clipboard.
+  - Cut of an object = copy + `RemoveItemsCommand` (one undo step).
+- **Cut `Ctrl+X`** (pixels) — copy + lift-then-discard (one undo step).
 - **Paste `Ctrl+V`** — `navigator.clipboard.read()` (fallback: `paste` event, then
   internal copy); decode PNG → new floating selection centred in the viewport
   (clamped inside the doc; images larger than the doc are pasted un-scaled and can
