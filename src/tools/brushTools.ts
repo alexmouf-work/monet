@@ -6,7 +6,11 @@ import { screenFromDoc, type View } from '../engine/viewport';
 import { beginStroke, endStroke, extendStroke, strokeActive } from './strokeEngine';
 import type { Tool, ToolPointerEvent } from './types';
 
-/** Cursor is drawn as an overlay so the tip's true footprint is visible at any zoom. */
+/**
+ * The tip outline is drawn as an overlay so the brush's true footprint is visible at any zoom.
+ * The system cursor stays visible on top of it (owner request): hiding it left nothing to
+ * track at low zoom, where the outline is only a pixel or two across.
+ */
 let hover: { x: number; y: number } | null = null;
 
 function settings(id: 'pen' | 'marker' | 'eraser'): BrushSettings {
@@ -46,7 +50,7 @@ function drawTipOutline(
 function makeBrush(id: 'pen' | 'marker' | 'eraser', label: string, graded: boolean): Tool {
   return {
     id,
-    cursor: 'none',
+    cursor: 'crosshair',
 
     onPointerDown(e: ToolPointerEvent) {
       if (e.button !== 0) return;

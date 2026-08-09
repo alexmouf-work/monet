@@ -114,6 +114,8 @@ Record `before`/`after` crops of `dirty` per layer into the `StrokeCommand`, pat
   temp. (Simple, correct; canvases are tiny.)
 - Brush cursor: `drawOverlay` draws the tip outline (circle/square of
   `size × zoom`) centred on the cursor, 1-px black + 1-px white double outline.
+  The CSS cursor stays `crosshair`, **not** `none` — the outline supplements the
+  pointer, it does not replace it [09 §8].
 
 ## 4. Marker tip (graded)
 

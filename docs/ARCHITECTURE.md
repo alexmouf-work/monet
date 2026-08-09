@@ -117,6 +117,8 @@ directory, so unknown paths correctly 404 instead.
   (docs/04 §6 and docs/05 §5).
 - **Fonts** are `@fontsource` packages (Silkscreen default), not Monocraft — docs/03 §6.2.
 - **Checkerboard** lightened to `#ffffff`/`#d4d4d4` — docs/01 §4 step 3.
+- **Brushes keep a visible `crosshair` cursor** instead of `cursor: none` — docs/09 §8, owner
+  directive 2026-08-09. The tip outline is an addition to the pointer, not a replacement.
 
 ## Invariants worth knowing before editing
 
