@@ -20,6 +20,7 @@ import { RecoverDialog } from './ui/dialogs/RecoverDialog';
 import { UnsavedDialog } from './ui/dialogs/ConfirmDialog';
 import { ShortcutsDialog } from './ui/dialogs/ShortcutsDialog';
 import { ResizeDialog } from './ui/dialogs/ResizeDialog';
+import { ExportDialog } from './ui/dialogs/ExportDialog';
 import { useShortcuts, type ShortcutActions } from './ui/useShortcuts';
 import { deleteSelection, duplicateSelected } from './app/editActions';
 import {
@@ -31,7 +32,7 @@ import {
   pasteFromEvent,
 } from './app/selectionActions';
 
-type DialogId = 'new' | 'recover' | 'shortcuts' | 'resize' | null;
+type DialogId = 'new' | 'recover' | 'shortcuts' | 'resize' | 'export' | null;
 
 export function App() {
   const [dialog, setDialog] = useState<DialogId>(null);
@@ -145,7 +146,7 @@ export function App() {
       save: () => withActive((id) => void saveDoc(useDocStore.getState().docs[id])),
       saveAs: () => withActive((id) => void saveDocAs(useDocStore.getState().docs[id])),
       saveProject: () => withActive((id) => void saveProjectAs(useDocStore.getState().docs[id])),
-      exportAs: notYet('Export'),
+      exportAs: () => setDialog('export'),
       recover: () => setDialog('recover'),
       closeTab: () => withActive(requestClose),
       copy: () => void copySelection(),
@@ -206,6 +207,7 @@ export function App() {
       {dialog === 'recover' && <RecoverDialog onClose={() => setDialog(null)} />}
       {dialog === 'shortcuts' && <ShortcutsDialog onClose={() => setDialog(null)} />}
       {dialog === 'resize' && <ResizeDialog onClose={() => setDialog(null)} />}
+      {dialog === 'export' && <ExportDialog onClose={() => setDialog(null)} />}
       {closingDoc && (
         <UnsavedDialog
           name={closingDoc.name}
