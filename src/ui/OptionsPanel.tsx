@@ -3,9 +3,10 @@ import { useToolStore } from '../app/toolStore';
 import { BrushesPanel } from './panels/BrushesPanel';
 import { ShapesPanel } from './panels/ShapesPanel';
 import { TextPanel } from './panels/TextPanel';
+import { CanvasPanel } from './panels/CanvasPanel';
 import { ColorPanel } from './ColorPanel';
 
-export function OptionsPanel() {
+export function OptionsPanel({ onResizeCanvas }: { onResizeCanvas(): void }) {
   const tab = useToolStore((s) => s.tab);
   return (
     <aside className="options">
@@ -13,7 +14,8 @@ export function OptionsPanel() {
         {tab === 'brushes' && <BrushesPanel />}
         {tab === 'shapes' && <ShapesPanel />}
         {tab === 'text' && <TextPanel />}
-        {tab !== 'brushes' && tab !== 'shapes' && tab !== 'text' && (
+        {tab === 'canvas' && <CanvasPanel onResize={onResizeCanvas} />}
+        {(tab === 'noise' || tab === 'recolour') && (
           <div className="panel__todo">Coming in a later milestone.</div>
         )}
       </div>

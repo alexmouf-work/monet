@@ -107,9 +107,19 @@ export function Workspace() {
     const ds = useDocStore.getState();
     const doc = ds.active();
     const view = doc ? useViewStore.getState().get(doc.id) : { zoom: 1, panX: 0, panY: 0 };
+    const raw = docFromScreen(view, screen);
+    // In tiling preview the neighbour tiles are live: wrap their coordinates into the
+    // centre tile so drawing across a seam continues on the opposite edge (docs/06 §3).
+    const wrapped =
+      useViewStore.getState().tiling && doc
+        ? {
+            x: ((raw.x % doc.width) + doc.width) % doc.width,
+            y: ((raw.y % doc.height) + doc.height) % doc.height,
+          }
+        : raw;
     return {
       screen,
-      doc: docFromScreen(view, screen),
+      doc: wrapped,
       buttons: e.buttons,
       button: (e as React.PointerEvent).button ?? 0,
       shift: e.shiftKey,

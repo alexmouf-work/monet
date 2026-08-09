@@ -143,6 +143,16 @@ const ui = {
     await page.locator('.colorpanel .swatches').first().locator('.swatch').nth(index).click();
     await page.waitForTimeout(80);
   },
+  /**
+   * Set a ColorField's hex input (a text field, so React sees the change — assigning to an
+   * <input type=color>.value programmatically does not fire React's onChange).
+   */
+  async setColorField(hex, index = 0) {
+    const field = page.locator('.panel .colorfield__hex').nth(index);
+    await field.fill(hex);
+    await field.press('Enter');
+    await page.waitForTimeout(120);
+  },
   /** Set a numeric field inside the options panel by its slider label. */
   async setNumber(label, value) {
     const input = page.locator(`.panel .slider:has-text("${label}") input[type="number"]`);

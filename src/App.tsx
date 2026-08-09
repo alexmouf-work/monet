@@ -19,6 +19,7 @@ import { NewDocDialog } from './ui/dialogs/NewDocDialog';
 import { RecoverDialog } from './ui/dialogs/RecoverDialog';
 import { UnsavedDialog } from './ui/dialogs/ConfirmDialog';
 import { ShortcutsDialog } from './ui/dialogs/ShortcutsDialog';
+import { ResizeDialog } from './ui/dialogs/ResizeDialog';
 import { useShortcuts, type ShortcutActions } from './ui/useShortcuts';
 import { deleteSelection, duplicateSelected } from './app/editActions';
 import {
@@ -30,7 +31,7 @@ import {
   pasteFromEvent,
 } from './app/selectionActions';
 
-type DialogId = 'new' | 'recover' | 'shortcuts' | null;
+type DialogId = 'new' | 'recover' | 'shortcuts' | 'resize' | null;
 
 export function App() {
   const [dialog, setDialog] = useState<DialogId>(null);
@@ -155,7 +156,7 @@ export function App() {
       crop: () => cropToSelection(),
       flatten: () => flattenDocument(),
       duplicate: () => duplicateSelected(),
-      resizeCanvas: notYet('Canvas resize'),
+      resizeCanvas: () => setDialog('resize'),
       shortcutsHelp: () => setDialog('shortcuts'),
       about: () => toast('Monet — Paint 3D-style editor for Minecraft textures.'),
     }),
@@ -196,7 +197,7 @@ export function App() {
           )}
         </section>
 
-        <OptionsPanel />
+        <OptionsPanel onResizeCanvas={() => setDialog('resize')} />
       </div>
 
       <StatusBar />
@@ -204,6 +205,7 @@ export function App() {
       {dialog === 'new' && <NewDocDialog onClose={() => setDialog(null)} />}
       {dialog === 'recover' && <RecoverDialog onClose={() => setDialog(null)} />}
       {dialog === 'shortcuts' && <ShortcutsDialog onClose={() => setDialog(null)} />}
+      {dialog === 'resize' && <ResizeDialog onClose={() => setDialog(null)} />}
       {closingDoc && (
         <UnsavedDialog
           name={closingDoc.name}
