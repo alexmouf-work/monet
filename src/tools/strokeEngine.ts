@@ -21,6 +21,7 @@ import { ctx2d, imageDataFrom, makeCanvas } from '../engine/layerCache';
 import { useDocStore } from '../app/docStore';
 import { useToolStore, type TipShape } from '../app/toolStore';
 import { setStrokeOverlay } from '../ui/sceneHooks';
+import { anchorIfFloating } from '../app/selectionActions';
 import { invalidate } from '../app/bus';
 
 export type StrokeKind = 'paint' | 'erase';
@@ -61,6 +62,7 @@ export function beginStroke(opts: {
   graded: boolean;
   at: { x: number; y: number };
 }): void {
+  anchorIfFloating();
   const doc = useDocStore.getState().active();
   if (!doc) return;
   const { color, alpha } = useToolStore.getState();

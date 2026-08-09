@@ -7,6 +7,7 @@ import { autosaveNow, startAutosave } from './app/autosave';
 import { openFile, openLocalFiles, saveDoc, saveDocAs, saveProjectAs } from './app/fileActions';
 import { listAutosaves } from './integrations/idb';
 import { selectAll } from './tools/marquee';
+import { isTypingTarget } from './ui/Workspace';
 import './tools';
 import { TopBar } from './ui/TopBar';
 import { AppMenu, type MenuActions } from './ui/AppMenu';
@@ -20,6 +21,14 @@ import { UnsavedDialog } from './ui/dialogs/ConfirmDialog';
 import { ShortcutsDialog } from './ui/dialogs/ShortcutsDialog';
 import { useShortcuts, type ShortcutActions } from './ui/useShortcuts';
 import { deleteSelection, duplicateSelected } from './app/editActions';
+import {
+  copySelection,
+  cropToSelection,
+  cutSelection,
+  flattenDocument,
+  pasteClipboard,
+  pasteFromEvent,
+} from './app/selectionActions';
 
 type DialogId = 'new' | 'recover' | 'shortcuts' | null;
 
@@ -80,6 +89,18 @@ export function App() {
     return () => window.removeEventListener('beforeunload', onBeforeUnload);
   }, []);
 
+  // Paste event as the fallback when the async clipboard API is unavailable.
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      if (isTypingTarget(e.target)) return;
+      void pasteFromEvent(e).then((handled) => {
+        if (handled) e.preventDefault();
+      });
+    };
+    window.addEventListener('paste', onPaste);
+    return () => window.removeEventListener('paste', onPaste);
+  }, []);
+
   // Window-wide drag and drop opens files.
   useEffect(() => {
     const stop = (e: DragEvent) => {
@@ -126,13 +147,13 @@ export function App() {
       exportAs: notYet('Export'),
       recover: () => setDialog('recover'),
       closeTab: () => withActive(requestClose),
-      copy: notYet('Clipboard'),
-      cut: notYet('Clipboard'),
-      paste: notYet('Clipboard'),
+      copy: () => void copySelection(),
+      cut: () => void cutSelection(),
+      paste: () => void pasteClipboard(),
       del: () => deleteSelection(),
       selectAll: () => selectAll(),
-      crop: notYet('Crop'),
-      flatten: notYet('Flatten'),
+      crop: () => cropToSelection(),
+      flatten: () => flattenDocument(),
       duplicate: () => duplicateSelected(),
       resizeCanvas: notYet('Canvas resize'),
       shortcutsHelp: () => setDialog('shortcuts'),

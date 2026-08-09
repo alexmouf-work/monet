@@ -27,10 +27,12 @@ import { useDocStore, selectedObject } from '../app/docStore';
 import { useViewStore } from '../app/viewStore';
 import { registerOverlayPainter } from '../ui/sceneHooks';
 import { beginMarquee, drawMarquee, extendMarquee, endMarquee, marqueeActive } from './marquee';
+import { anchorSelection, liftSelection, setFloatPosition } from '../app/selectionActions';
 import type { Tool, ToolPointerEvent } from './types';
 
 type Drag =
   | { kind: 'move'; id: number; before: ObjectItem; grab: Vec2 }
+  | { kind: 'float'; grab: Vec2; origin: Vec2 }
   | { kind: 'scale'; id: number; before: ObjectItem; handle: HandleId }
   | { kind: 'rotate'; id: number; before: ObjectItem }
   | { kind: 'point'; id: number; before: ObjectItem; index: number };
@@ -44,7 +46,10 @@ const view = (): View => {
 };
 
 function commit() {
-  if (!drag) return;
+  if (!drag || drag.kind === 'float') {
+    drag = null;
+    return;
+  }
   const d = drag;
   drag = null;
   const doc = useDocStore.getState().active();
@@ -66,11 +71,13 @@ const labelFor = (kind: Drag['kind']) =>
         ? 'Rotate'
         : 'Edit points';
 
+type ObjectDrag = Exclude<Drag, { kind: 'float' }>;
+
 /** Mutates the live object during a drag; the command is captured on pointer-up. */
 function mutate(fn: (obj: ObjectItem) => void) {
   const doc = useDocStore.getState().active();
-  if (!doc || !drag) return;
-  const obj = doc.stack.find((i) => i.id === drag!.id);
+  if (!doc || !drag || drag.kind === 'float') return;
+  const obj = doc.stack.find((i) => i.id === (drag as ObjectDrag).id);
   if (!obj || obj.kind === 'raster') return;
   fn(obj);
   invalidate();
@@ -108,6 +115,22 @@ export const selectTool: Tool = {
       }
     }
 
+    // Dragging inside an existing marquee lifts those pixels and moves them (docs/06 §4.1).
+    const sel = ds.selection;
+    if (sel) {
+      const r = sel.floating
+        ? { x: sel.floating.x, y: sel.floating.y, w: sel.floating.w, h: sel.floating.h }
+        : sel.rect;
+      const inside = e.doc.x >= r.x && e.doc.y >= r.y && e.doc.x < r.x + r.w && e.doc.y < r.y + r.h;
+      if (inside) {
+        const f = sel.floating ?? liftSelection();
+        if (f) {
+          drag = { kind: 'float', grab: { ...e.doc }, origin: { x: f.x, y: f.y } };
+          return;
+        }
+      }
+    }
+
     const obj = hitObject(doc, e.doc, v.zoom);
     if (obj) {
       if (!selected || selected.id !== obj.id) ds.selectObject(obj.id);
@@ -116,6 +139,8 @@ export const selectTool: Tool = {
     }
 
     ds.selectObject(null);
+    // Clicking outside a float anchors it before starting a new marquee.
+    if (ds.selection?.floating) anchorSelection();
     beginMarquee(e.doc);
   },
 
@@ -145,11 +170,19 @@ export const selectTool: Tool = {
       return;
     }
 
+    if (drag.kind === 'float') {
+      setFloatPosition(
+        drag.origin.x + (e.doc.x - drag.grab.x),
+        drag.origin.y + (e.doc.y - drag.grab.y),
+      );
+      return;
+    }
     if (drag.kind === 'move') {
-      const dx = e.doc.x - drag.grab.x;
-      const dy = e.doc.y - drag.grab.y;
+      const d = drag;
+      const dx = e.doc.x - d.grab.x;
+      const dy = e.doc.y - d.grab.y;
       mutate((obj) => {
-        obj.transform = moveTransform(drag!.before.transform, dx, dy);
+        obj.transform = moveTransform(d.before.transform, dx, dy);
       });
       return;
     }
@@ -165,8 +198,9 @@ export const selectTool: Tool = {
       return;
     }
     if (drag.kind === 'rotate') {
+      const d = drag;
       mutate((obj) => {
-        obj.transform = rotateTransform(drag!.before.transform, e.doc, e.shift);
+        obj.transform = rotateTransform(d.before.transform, e.doc, e.shift);
       });
       return;
     }
@@ -180,6 +214,10 @@ export const selectTool: Tool = {
   },
 
   onPointerUp(e: ToolPointerEvent) {
+    if (drag?.kind === 'float') {
+      drag = null;
+      return;
+    }
     if (drag) {
       commit();
       return;
@@ -225,8 +263,12 @@ registerOverlayPainter((ctx, v) => {
   if (obj && obj.kind !== 'raster') drawObjectChrome(ctx, obj as ObjectItem, v);
 });
 
-/** Nudge the selected object with the arrow keys (docs/03 §2.2). */
+/** Nudge the selected object — or a floating selection — with the arrow keys. */
 export function nudgeSelected(dx: number, dy: number): boolean {
+  if (useDocStore.getState().selection?.floating) {
+    void import('../app/selectionActions').then((m) => m.moveFloat(dx, dy));
+    return true;
+  }
   const obj = selectedObject();
   if (!obj || obj.kind === 'raster') return false;
   const doc = useDocStore.getState().active();

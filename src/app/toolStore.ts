@@ -86,6 +86,14 @@ export const TAB_TOOL: Record<FeatureTab, ToolId | null> = {
 
 export const BRUSH_TOOLS: ToolId[] = ['pen', 'marker', 'eraser', 'bucket', 'eyedropper'];
 
+/**
+ * Anchoring lives in `app/selectionActions`, which imports this store — so reach it lazily to
+ * keep the module graph acyclic.
+ */
+function anchorFloatBeforeToolChange() {
+  void import('./selectionActions').then((m) => m.anchorIfFloating());
+}
+
 export const useToolStore = create<ToolState>((set, get) => ({
   active: 'pen',
   tab: 'brushes',
@@ -122,6 +130,7 @@ export const useToolStore = create<ToolState>((set, get) => ({
   recents: [PAINT_PALETTE[0]],
 
   setTool(id) {
+    if (get().active !== id) anchorFloatBeforeToolChange();
     set({ active: id, previous: null });
     invalidate(false);
   },

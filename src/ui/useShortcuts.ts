@@ -5,6 +5,7 @@ import { useViewStore } from '../app/viewStore';
 import { useToolStore, type FeatureTab, type ToolId } from '../app/toolStore';
 import { getTool } from '../tools';
 import { nudgeSelected } from '../tools/selectTool';
+import { anchorSelection } from '../app/selectionActions';
 import { isTypingTarget } from './Workspace';
 
 export interface ShortcutActions {
@@ -150,11 +151,23 @@ export function useShortcuts(actions: ShortcutActions) {
       }
 
       switch (e.code) {
+        case 'Enter':
+          if (ds.selection?.floating) {
+            anchorSelection();
+            e.preventDefault();
+          }
+          return;
         case 'Delete':
         case 'Backspace':
           actions.del();
           return;
         case 'Escape':
+          // A lifted float must be anchored, not dropped: its pixels were already cleared
+          // from the layers, so discarding here would lose them (docs/06 §4.1 step 4).
+          if (ds.selection?.floating) {
+            anchorSelection();
+            return;
+          }
           ds.selectObject(null);
           ds.setSelection(null);
           return;
