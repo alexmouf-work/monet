@@ -949,3 +949,34 @@ select {
   border-radius: 4px;
   background: var(--panel-2);
 }
+
+/* ---------- recolour chips ---------- */
+
+.chiprow {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.chiprow__swatch {
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  flex: none;
+}
+
+.chiprow__hex {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+}
+
+.chiprow__hex.is-invalid {
+  border-color: var(--danger);
+  outline: 1px solid var(--danger);
+}

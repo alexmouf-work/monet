@@ -22,9 +22,39 @@ export function pickColorAt(x: number, y: number): { hex: string; alpha: number 
   return { hex: rgbToHex(data[i], data[i + 1], data[i + 2]), alpha };
 }
 
+/**
+ * One-shot pick: a panel arms a callback, the next canvas click delivers the colour there
+ * instead of to the active colour (docs/05 §1, the chip eyedropper buttons).
+ */
+let armedTarget: ((hex: string) => void) | null = null;
+const armListeners = new Set<() => void>();
+
+export function armPick(fn: (hex: string) => void): void {
+  armedTarget = fn;
+  useToolStore.getState().pushTransient('eyedropper');
+  for (const l of armListeners) l();
+}
+
+export const pickArmed = () => armedTarget !== null;
+
+export function onPickArmChange(fn: () => void): () => void {
+  armListeners.add(fn);
+  return () => {
+    armListeners.delete(fn);
+  };
+}
+
 function pick(e: ToolPointerEvent) {
   const hit = pickColorAt(e.doc.x, e.doc.y);
   if (!hit) return;
+  if (armedTarget) {
+    const fn = armedTarget;
+    armedTarget = null;
+    fn(hit.hex);
+    for (const l of armListeners) l();
+    useToolStore.getState().popTransient();
+    return;
+  }
   const ts = useToolStore.getState();
   // Fully transparent: keep the current hue, take the alpha.
   if (hit.alpha === 0) ts.setColor(ts.color, 0);

@@ -5,6 +5,7 @@ import { ShapesPanel } from './panels/ShapesPanel';
 import { TextPanel } from './panels/TextPanel';
 import { CanvasPanel } from './panels/CanvasPanel';
 import { NoisePanel } from './panels/NoisePanel';
+import { RecolourPanel } from './panels/RecolourPanel';
 import { ColorPanel } from './ColorPanel';
 
 export function OptionsPanel({ onResizeCanvas }: { onResizeCanvas(): void }) {
@@ -17,7 +18,7 @@ export function OptionsPanel({ onResizeCanvas }: { onResizeCanvas(): void }) {
         {tab === 'text' && <TextPanel />}
         {tab === 'canvas' && <CanvasPanel onResize={onResizeCanvas} />}
         {tab === 'noise' && <NoisePanel />}
-        {tab === 'recolour' && <div className="panel__todo">Coming in a later milestone.</div>}
+        {tab === 'recolour' && <RecolourPanel />}
       </div>
       <ColorPanel />
     </aside>
