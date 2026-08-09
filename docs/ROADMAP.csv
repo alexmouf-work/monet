@@ -1,8 +1,8 @@
 id,area,item,status,notes
 S1,spec,v1 technical specification docs/00-10,done,2026-08-09 commit 081e6de
 G1,governance,charter + progress docs (CLAUDE.md / CONTEXT / ROADMAP / ARCHITECTURE),done,2026-08-09
-G2,governance,confirm GitHub default branch = main (owner: repo settings),planned,repo was created empty; first push made claude/paint-3d-* default unless owner already flipped
-G3,governance,delete stale claude/paint-3d-minecraft-textures-j3mo9o branch,planned,after G2; content is fully contained in main
+G2,governance,confirm GitHub default branch = main,done,2026-08-09 verified via API; owner had renamed claude/paint-3d-* to main
+G3,governance,remove stale claude/paint-3d-minecraft-textures-j3mo9o branch,done,2026-08-09 remote gone via owner rename; local deleted + pruned
 M0,build,scaffold: vite react-ts + eslint/prettier + vitest + playwright + CI workflow,planned,accept: docs/10 M0
 M1,build,document model + compositor + layer cache + viewport (zoom/pan/fit/grid) + new-doc dialog + doc tabs + status bar,planned,accept: docs/10 M1 + 01 SS10
 M2,build,stroke engine + pixel pen + eraser + undo/redo + Ctrl+S/Save-As (FSA+fallback) + PNG export + .monet round-trip + autosave/recover,planned,accept: docs/10 M2
