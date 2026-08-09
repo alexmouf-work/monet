@@ -21,7 +21,7 @@ eslint.config.js .prettierrc.json      lint/format
 playwright.config.ts                   e2e (build + preview on :4173)
 public/icon-{192,512}.png              app icons (generated)
 .github/workflows/ci.yml               format → lint → typecheck → test → build
-.github/workflows/deploy.yml           Pages deploy + CNAME monet.mouftools.com
+vercel.json                            Vercel preset, output dist/, PWA cache headers
 
 src/core/                              PURE: no DOM, no React, all unit-tested
   model/{types,document,commands}.ts   canonical shapes, auto-layering, undo commands
@@ -81,6 +81,19 @@ Scenarios: `smoke` · `full` · `layering` (the owner's scenario) · `text` · `
 `canvas` · `noise` · `recolour` · `export` · `save` · `sources` (GitHub against a mocked API).
 
 CI runs unit tests + build, not the harness or Playwright (no browser in the runner).
+
+## Hosting (Vercel, owner decision 2026-08-09)
+
+Deploys come from Vercel's Git integration — push to `main` ships production, every other
+branch gets a preview URL — so there is no deploy workflow in `.github/`. `vercel.json` pins
+the Vite preset and output directory and sets PWA-correct caching: hashed `/assets/*`
+immutable for a year, but `sw.js`, `registerSW.js`, the workbox runtime, the manifest and
+`index.html` `must-revalidate`, or an updated service worker could never be picked up.
+
+**No catch-all rewrite on purpose.** Monet has no client-side routing, and `base: './'` keeps
+asset URLs relative (so a build also works from a subpath or `file://`). Rewriting an unknown
+nested path to `index.html` would make those relative URLs resolve against the wrong
+directory, so unknown paths correctly 404 instead.
 
 ## Deviations from the spec's module list (docs/01 §2), with reasons
 

@@ -4,8 +4,8 @@
 a fully client-side web app (installable as a PWA) that connects directly to Minecraft
 jars, mods, and GitHub repositories.
 
-Named for the painter; part of the [mouftools](https://mouftools.com) family, deployed
-to `monet.mouftools.com`.
+Named for the painter; part of the [mouftools](https://mouftools.com) family, deployed on
+**Vercel** at `monet.mouftools.com`.
 
 ```bash
 npm install
@@ -76,6 +76,22 @@ Settings; it is stored in your browser and sent only to `api.github.com`.
 Saving into a repo or folder writes the flat PNG where it belongs plus a `.monet`
 project into a mirrored `.monet/` tree at the root — so the text and shapes stay
 editable, from any machine, without ever being packaged into a built jar.
+
+## Deploying
+
+Hosted on Vercel as a static build — nothing in Monet needs a server, so there are no
+serverless functions.
+
+1. In Vercel, **Add New → Project** and import `alexmouf-work/monet`. The Vite preset is
+   detected automatically; `vercel.json` pins it anyway, along with `dist` as the output
+   directory and the cache headers a service worker needs.
+2. **Settings → Domains → Add** `monet.mouftools.com`, then point that DNS record at Vercel.
+
+After that, every push to `main` deploys to production and every other branch gets its own
+preview URL. GitHub Actions only runs the checks (format, lint, typecheck, tests, build) — it
+does not deploy.
+
+To ship from a terminal instead: `npx vercel --prod`.
 
 ## Docs
 

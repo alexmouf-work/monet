@@ -14,7 +14,7 @@ resolved here; later docs only add mechanism.
 
 | # | Decision | Rationale |
 | - | -------- | --------- |
-| D1 | **Platform: client-side web app + PWA** (owner-confirmed) | Matches the mouftools pattern (static app per subdomain); every required function — jar parsing, painting, exports, GitHub branch/push/merge — works client-side. Canvas performance is identical to a wrapped native app. |
+| D1 | **Platform: client-side web app + PWA**, hosted on **Vercel** (owner-confirmed; Vercel chosen 2026-08-09) | Matches the mouftools pattern (static app per subdomain); every required function — jar parsing, painting, exports, GitHub branch/push/merge — works client-side. Canvas performance is identical to a wrapped native app. Nothing in the app needs a server, so Vercel serves it as static output with zero functions. |
 | D2 | **Stack: Vite + React + TypeScript + Zustand, Canvas 2D rendering** | Most-documented path for a junior; textures are small (≤4096², typically ≤512²) so Canvas 2D + typed arrays is plenty. No WebGL. |
 | D3 | **Scope: the owner's feature lists + editor essentials; no extra Paint 3D brushes** (owner-confirmed) | Essentials = undo/redo, eyedropper, palette, clipboard, shortcuts, pixel grid, tiling preview, autosave. Explicitly excluded: pencil/crayon/spray/calligraphy/oil/watercolour brushes, stickers, magic select, 3D anything, effects beyond noise & recolour. |
 | D4 | **Hybrid layer model, invisible to the user** | Brush strokes rasterise into *paint layers*; shapes and text stay live vector *objects*; the z-order is an interleaved stack managed automatically ("layering behind the scenes"). No layers panel. See `01-architecture §3`. |

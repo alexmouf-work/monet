@@ -87,8 +87,11 @@ vite-plugin-pwa (installable, offline shell, update toast); app icons; shortcuts
 overlay; toasts everywhere they're specced; unsaved-changes guards
 (`beforeunload` + tab close dialog); Recover/Settings dialogs finished; a
 performance pass at 1024² (stroke latency < 16 ms mid-stroke); README updated
-with user-facing usage docs; deploy workflow (static host of `dist/` — GitHub
-Pages via Actions, path-base configured) ready for `monet.mouftools.com`.
+with user-facing usage docs; **Vercel** deployment (owner decision 2026-08-09:
+Vercel rather than GitHub Pages) — `vercel.json` pins the Vite preset, output
+`dist/`, and PWA-correct cache headers; the repo is connected in Vercel's
+dashboard so every push to `main` deploys and every branch gets a preview.
+Domain `monet.mouftools.com` is added in Vercel → Settings → Domains.
 **Accept:** Lighthouse PWA installable; offline reload works for local editing;
 all doc Acceptance sections pass end-to-end; tag `v1.0.0`.
 

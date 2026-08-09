@@ -43,3 +43,12 @@ up with no build step.
 | `layering.mjs` | the owner's layering scenario (docs/01 §3.1) with pixel-level assertions |
 | `text.mjs` | text placement, typing, styling, re-editing |
 | `save.mjs` | Ctrl+S routing: FSA handle, silent re-save, `.monet`, download fallback |
+| `sources.mjs` | jar browsing + the whole GitHub flow against a mocked `api.github.com` |
+| `canvas.mjs` `noise.mjs` `recolour.mjs` `export.mjs` | one per feature tab / format set |
+
+## Production output check
+
+`node tests/manual/prodboot.mjs` (after `npx vite build`) serves `dist/` the way a static host
+does — this is what Vercel serves — and asserts the shell renders, the manifest and service
+worker resolve, the SW registers at scope `/`, and a document can be drawn in. Use it after any
+change to `vite.config.ts`, `vercel.json` or the PWA setup.
