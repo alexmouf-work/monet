@@ -741,3 +741,146 @@ kbd {
   vertical-align: top;
   font-size: 12px;
 }
+
+/* ---------- colour panel ---------- */
+
+.options__scroll {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.colorpanel {
+  border-top: 1px solid var(--border);
+  padding: 8px 10px 10px;
+  background: var(--panel-2);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: none;
+}
+
+.colorpanel__top {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+/* Checkerboard behind the current colour so alpha is visible. */
+.colorpanel__current {
+  width: 42px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background-image:
+    linear-gradient(var(--c), var(--c)),
+    linear-gradient(45deg, #a8a8a8 25%, transparent 25%, transparent 75%, #a8a8a8 75%),
+    linear-gradient(45deg, #a8a8a8 25%, #cfcfcf 25%, #cfcfcf 75%, #a8a8a8 75%);
+  background-size:
+    100% 100%,
+    12px 12px,
+    12px 12px;
+  background-position:
+    0 0,
+    0 0,
+    6px 6px;
+  opacity: 1;
+  position: relative;
+}
+
+.colorpanel__current::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--c);
+  opacity: var(--a);
+  border-radius: 4px;
+}
+
+.colorpanel__fields {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.colorpanel__hex {
+  width: 100%;
+  padding: 3px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-variant-numeric: tabular-nums;
+  text-transform: uppercase;
+}
+
+.colorpanel__alpha {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.colorpanel__alpha input {
+  flex: 1;
+  min-width: 0;
+}
+
+.colorpanel__alpha output {
+  font-variant-numeric: tabular-nums;
+  min-width: 34px;
+  text-align: right;
+}
+
+.colorpanel__sv,
+.colorpanel__hue {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  touch-action: none;
+  cursor: crosshair;
+  display: block;
+}
+
+.swatches__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+
+.swatches {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 3px;
+}
+
+.swatch {
+  aspect-ratio: 1;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 0;
+  cursor: pointer;
+}
+
+.swatch:hover {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.swatches__empty {
+  grid-column: 1 / -1;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.iconbtn--tiny {
+  min-width: 20px;
+  height: 18px;
+  line-height: 1;
+  font-size: 12px;
+}
