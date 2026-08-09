@@ -4,64 +4,87 @@
 a fully client-side web app (installable as a PWA) that connects directly to Minecraft
 jars, mods, and GitHub repositories.
 
-Named for the painter; part of the [mouftools](https://mouftools.com) family, intended
-to live at `monet.mouftools.com`.
-
-## What it does
-
-- Paint-3D-style editor: brushes, 2D shapes, text, canvas tools — plus **noise** and
-  **recolour** systems purpose-built for texture work.
-- Open textures straight out of a **Minecraft jar / mod jar** (parsed in the browser),
-  a **local folder**, or a **GitHub repository**.
-- GitHub workflow: Monet creates a working branch, **every save commits and pushes**
-  to it, and a **Sync button fast-forwards** any branch (default `main`) to the same
-  state.
-- Exports PNG (default), JPEG, WebP, ICO, BMP and PDF; saves layered projects as
-  `.monet` files.
-
-## Status
-
-**Specification stage.** The complete, implementation-ready technical specification
-lives in [`docs/`](docs/) — start at [`docs/00-overview.md`](docs/00-overview.md).
-No application code exists yet.
-
-Live status and working rules (Claude-readable-first):
-[`CLAUDE.md`](CLAUDE.md) — agent charter ·
-[`docs/CONTEXT.md`](docs/CONTEXT.md) — durable decisions + shipped ·
-[`docs/ROADMAP.csv`](docs/ROADMAP.csv) — work items + status ·
-[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — as-built map.
-
-## The spec, in reading order
-
-| Doc | Contents |
-| --- | --- |
-| [00-overview](docs/00-overview.md) | Product overview, locked decisions, feature inventory, exclusions, assumptions |
-| [01-architecture](docs/01-architecture.md) | Stack, module layout, the document model (hybrid raster/vector stack), rendering pipeline, undo/redo, canonical TypeScript types |
-| [02-brushes](docs/02-brushes.md) | Pixel pen, marker, eraser, paint bucket; the stroke engine; colour system |
-| [03-shapes-text](docs/03-shapes-text.md) | All ten 2D shapes with exact geometry, transforms/handles, splines; the text tool |
-| [04-noise](docs/04-noise.md) | The noise system: 13 noise types with reference implementations, rotation/zoom/intensity, brightness/hue application |
-| [05-recolour](docs/05-recolour.md) | Targeted recolour (multi-target → result) and uniform tint (brightness-preserving) |
-| [06-canvas-view-selection](docs/06-canvas-view-selection.md) | Canvas settings & operations, zoom/pan/grid/tiling preview, rectangular selection & clipboard |
-| [07-file-io](docs/07-file-io.md) | Every import/export format incl. byte-level ICO/BMP writers and exact PDF fit maths; the `.monet` project format; autosave |
-| [08-minecraft-github](docs/08-minecraft-github.md) | Jar/mod parsing, local folder sources, and the full GitHub integration (token, branch, push-on-save, fast-forward sync) |
-| [09-ui](docs/09-ui.md) | Complete UI spec: layout, every panel and control, dialogs, shortcuts, cursors |
-| [10-milestones](docs/10-milestones.md) | Build order M0–M12 with per-milestone tasks and acceptance checklists; testing strategy; CI |
-
-## Conventions used throughout the spec
-
-- **Prose uses UK spelling** (colour, rasterise); **code uses US spelling**
-  (`color`, `rasterize`) — matching web platform APIs.
-- Code blocks marked *reference implementation* are canonical: type them in as
-  written (they are deliberately dependency-free and unit-testable).
-- The TypeScript interfaces in `01-architecture` are the single source of truth for
-  data shapes; other docs refer to them.
-- Every feature section ends with **Acceptance** — concrete checks that define done.
-
-## Running (once M0 is complete)
+Named for the painter; part of the [mouftools](https://mouftools.com) family, deployed
+to `monet.mouftools.com`.
 
 ```bash
 npm install
 npm run dev        # Vite dev server
-npm test           # Vitest unit tests
+npm test           # unit tests (src/core)
+npm run harness    # drive the real app in a browser and screenshot it
 npm run build      # production build in dist/
 ```
+
+## What it does
+
+**Brushes** — pixel pen (hard, one exact colour across the tip), marker (fades to
+transparency across the radius), eraser, and a paint bucket with tolerance. Square or
+circular tips, sizes 1–64. `Alt` picks a colour with any tool.
+
+**2D shapes** — triangle, rectangle, pentagon, hexagon, circle, ellipse, arrow,
+arrowhead, line and spline. Independent fill and outline colour, opacity and weight;
+rotate through 360° by handle or number; drag any of eight handles; drag line/spline
+points individually and `Alt`-click to add or remove them.
+
+**Text** — bundled pixel fonts (Silkscreen, Press Start 2P, VT323) plus the generic
+families, bold/italic/underline, alignment, opacity, rotation, edited in place on the
+canvas.
+
+**Noise** — 13 types (Perlin, clouds, soft blobs, Worley cells, marble, wood, stripes,
+zigzag, checker, rings, up/down gradient, radial, white) with rotation, scale,
+intensity, a seed you can re-roll, and a choice of affecting brightness, hue or both.
+Live preview, one click to bake.
+
+**Recolour** — swap any number of target colours for one result colour with a
+tolerance, or tint the whole image to one colour while keeping every pixel's
+brightness. Live preview, one click to bake.
+
+**Canvas** — transparent or coloured background (the colour is remembered across
+toggles), resize in px or %, aspect lock, resize-image-with-canvas, 90° rotations and
+flips.
+
+**Everywhere** — scroll to zoom at the cursor, rectangular select with lift/move/
+anchor, clipboard, crop, flatten, undo/redo 200 deep, pixel grid, **3×3 tiling
+preview** for checking seams, autosave with crash recovery.
+
+**Export** — PNG (default), JPEG, WebP, ICO (multi-size), BMP and PDF.
+
+### Layers, without a layers panel
+
+Brush strokes rasterise; shapes and text stay live objects. The stack is managed for
+you: draw a background, add text, draw on top of the text, then move the text — the
+strokes stay exactly where they were *and* stay above the text. Flatten (`Ctrl+Shift+F`)
+when you want noise, recolour or the eraser to affect shapes and text too.
+
+### Minecraft & GitHub
+
+Add a **Minecraft or mod jar** and browse its `assets/**` textures (cached, so it
+survives reloads; animated strips are badged). Add a **local folder**, or a **GitHub
+repository**.
+
+For a repository, Monet creates a working branch (`monet` by default), **every save is
+one commit and push** carrying the PNG *and* its layered project, and **Sync**
+fast-forwards `main` — or any branch — to match, falling back to a merge commit when
+the branches have diverged. It never force-pushes. Editing a vanilla texture and saving
+it into your mod repo suggests the right path automatically.
+
+Connect with a fine-grained personal access token (**Contents: Read and write**) in
+Settings; it is stored in your browser and sent only to `api.github.com`.
+
+## Layered project files
+
+Saving into a repo or folder writes the flat PNG where it belongs plus a `.monet`
+project into a mirrored `.monet/` tree at the root — so the text and shapes stay
+editable, from any machine, without ever being packaged into a built jar.
+
+## Docs
+
+Working rules and live state: [`CLAUDE.md`](CLAUDE.md) (agent charter) ·
+[`docs/CONTEXT.md`](docs/CONTEXT.md) (decisions, shipped) ·
+[`docs/ROADMAP.csv`](docs/ROADMAP.csv) (status) ·
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) (as-built map) ·
+[`tests/manual/README.md`](tests/manual/README.md) (the GUI harness).
+
+The design specification — the contract the implementation follows — is
+[`docs/00-overview.md`](docs/00-overview.md) through
+[`docs/10-milestones.md`](docs/10-milestones.md).

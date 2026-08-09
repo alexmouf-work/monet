@@ -26,6 +26,7 @@ import { SyncDialog } from './ui/dialogs/SyncDialog';
 import { SettingsDialog } from './ui/dialogs/SettingsDialog';
 import { SourcesSidebar } from './ui/SourcesSidebar';
 import { SaveAsDialog } from './ui/dialogs/SaveAsDialog';
+import { UpdatePrompt } from './ui/UpdatePrompt';
 import { addJarSource, restoreJarSources } from './integrations/jar/jarSource';
 import {
   addFolderSource,
@@ -299,6 +300,8 @@ export function App() {
           onCancel={() => setClosing(null)}
         />
       )}
+
+      <UpdatePrompt />
 
       <div className="toasts">
         {toasts.map((t) => (

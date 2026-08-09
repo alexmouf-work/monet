@@ -24,13 +24,29 @@ collaboration, any server component.
 
 ## Shipped
 
-(nothing yet — no application code)
+**v1 complete (M0–M12).** Every feature in docs/00 §3 is implemented and verified in a real
+browser. See docs/ARCHITECTURE.md for the as-built map and ROADMAP.csv for per-milestone notes.
 
 | date | item |
 | ---- | ---- |
 | 2026-08-09 | v1 technical specification, docs/00–10 (commit 081e6de). |
 | 2026-08-09 | Charter + progress-docs system (this governance layer). |
+| 2026-08-09 | M0 scaffold; M1 compositor/viewport/shell; M2 stroke engine + brushes + file IO; M3 colour/eyedropper/bucket; M4 shapes; M5 text (+ GUI harness); M6 selection/clipboard/flatten; M7 canvas ops; M8 noise; M9 recolour; M10 export formats; M11 jar/folder/GitHub sources; M12 PWA + deploy. |
+
+## Owner-visible behaviour worth remembering
+
+- The owner's layering scenario is a verified invariant, not an aspiration: harness scenario
+  `layering.mjs` asserts stack order raster/text/raster and an identical stroke pixel count
+  before and after moving the text.
+- Ctrl+S into a repo = exactly one commit carrying the PNG and its `.monet` mirror; Sync
+  fast-forwards the target branch and falls back to a merge commit; Monet never force-pushes.
+- Jars are read-only: saving a vanilla texture routes to Save As, which suggests the repo's own
+  assets root plus the jar path's `assets/...` tail.
 
 ## Superseded / cut
 
-(none)
+| date | change |
+| ---- | ------ |
+| 2026-08-09 | Bundled font default: Monocraft → **Silkscreen**. Monocraft is not published on npm and the build environment cannot fetch font binaries from GitHub. Adding it later is one @font-face plus one entry in src/ui/fonts.ts. (docs/03 §6.2 updated) |
+| 2026-08-09 | Checkerboard #cfcfcf/#a8a8a8 → **#ffffff/#d4d4d4**: the specced grey pixel grid was invisible against a mid-grey checker, which defeats the grid's purpose on transparent canvases. (docs/01 §4, docs/06 §2 updated) |
+| 2026-08-09 | PDF fit is **contain**, not a literal longest-edge match, so images squarer than the page are not cropped; identical to the literal rule for anything at least as elongated as A4. (docs/07 §6) |

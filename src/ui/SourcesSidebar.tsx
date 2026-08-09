@@ -1,5 +1,5 @@
 /** Sources sidebar — docs/08 §1, docs/09 §4. One texture tree per connected source. */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MAX_DIM } from '../core/model/types';
 import { createDoc } from '../core/model/document';
 import { readMonet } from '../core/io/monetFile';
@@ -18,6 +18,89 @@ import { removeFolderSource } from '../integrations/fsa/folderSource';
 import { forgetRepo } from '../integrations/github/repoSource';
 
 const ICONS = { jar: '🫙', repo: '⎇', folder: '📁' } as const;
+
+const THUMB_LIMIT = 512;
+const thumbCache = new Map<string, string>();
+
+/** 24px nearest-neighbour thumbnail, decoded on demand and LRU-capped (docs/08 §1). */
+function useThumb(source: SourceProvider, node: TextureNode, visible: boolean): string | null {
+  const key = `${source.id}|${node.path}`;
+  const [url, setUrl] = useState<string | null>(thumbCache.get(key) ?? null);
+
+  useEffect(() => {
+    if (!visible || url) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { png } = await source.read(node);
+        const bitmap = await createImageBitmap(new Blob([png as BlobPart], { type: 'image/png' }));
+        const c = document.createElement('canvas');
+        c.width = c.height = 24;
+        const ctx = c.getContext('2d')!;
+        ctx.imageSmoothingEnabled = false;
+        const s = Math.min(24 / bitmap.width, 24 / bitmap.height);
+        const w = Math.max(1, Math.round(bitmap.width * s));
+        const h = Math.max(1, Math.round(bitmap.height * s));
+        ctx.drawImage(bitmap, 0, 0, bitmap.width, bitmap.height, (24 - w) / 2, (24 - h) / 2, w, h);
+        bitmap.close?.();
+        const data = c.toDataURL('image/png');
+        if (thumbCache.size >= THUMB_LIMIT) thumbCache.delete(thumbCache.keys().next().value!);
+        thumbCache.set(key, data);
+        if (!cancelled) setUrl(data);
+      } catch {
+        /* unreadable entry: the row still works without a thumbnail */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [key, node, source, url, visible]);
+
+  return url;
+}
+
+function TextureRow({ source, node }: { source: SourceProvider; node: TextureNode }) {
+  const [seen, setSeen] = useState(false);
+  const ref = useRef<HTMLLIElement>(null);
+
+  // Only decode what actually scrolls into view: a vanilla jar has thousands of entries.
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || seen) return;
+    const io = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) {
+        setSeen(true);
+        io.disconnect();
+      }
+    });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [seen]);
+
+  const thumb = useThumb(source, node, seen);
+
+  return (
+    <li ref={ref}>
+      <button
+        className="srctree__item"
+        title={node.path}
+        onClick={() => void openTexture(source, node)}
+      >
+        {thumb ? (
+          <img className="srctree__thumb" src={thumb} alt="" width={24} height={24} />
+        ) : (
+          <span className="srctree__thumb" />
+        )}
+        <span className="srctree__name">{node.path.split('/').pop()}</span>
+        {node.hasProject && <span className="srctree__badge" title="Has a layered project" />}
+        {node.animated && (
+          <span className="srctree__badge srctree__badge--anim" title="Animated (.mcmeta)" />
+        )}
+        <span className="srctree__path">{node.path}</span>
+      </button>
+    </li>
+  );
+}
 
 export function SourcesSidebar({
   onAddJar,
@@ -190,26 +273,7 @@ function SourceBlock({
           )}
           <ul className="srctree">
             {shown.map((n) => (
-              <li key={n.path}>
-                <button
-                  className="srctree__item"
-                  title={n.path}
-                  onDoubleClick={() => void openTexture(source, n)}
-                  onClick={() => void openTexture(source, n)}
-                >
-                  <span className="srctree__name">{n.path.split('/').pop()}</span>
-                  {n.hasProject && (
-                    <span className="srctree__badge" title="Has a layered project" />
-                  )}
-                  {n.animated && (
-                    <span
-                      className="srctree__badge srctree__badge--anim"
-                      title="Animated (.mcmeta)"
-                    />
-                  )}
-                  <span className="srctree__path">{n.path}</span>
-                </button>
-              </li>
+              <TextureRow key={n.path} source={source} node={n} />
             ))}
           </ul>
         </>

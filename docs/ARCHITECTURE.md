@@ -1,84 +1,124 @@
 # Monet — architecture (as built)
 
-Rule (CLAUDE.md): this file maps what **exists on `main`**, overview first, details
-after. Update it in the same commit as any architecture-affecting change. The
-*target* design lives in the numbered spec (`docs/01-architecture.md` et al.) — do
-not duplicate it here; describe reality and point.
+Rule (CLAUDE.md): this file maps what **exists on `main`**, overview first, details after.
+Update it in the same commit as any architecture-affecting change. The *target* design is the
+numbered spec (`docs/00`–`docs/10`) — do not duplicate it here; describe reality and point.
 
-## Current state (2026-08-09) — M0 scaffold
+## State: v1 complete (2026-08-09, M0–M12)
+
+Every feature in `docs/00 §3` is implemented and exercised in a real browser. 101 unit tests
+over `src/core`; behaviour verified by harness scenarios (below).
+
+## Tree
 
 ```
-CLAUDE.md  README.md  docs/          governance + v1 spec (design contract)
-index.html                           SPA entry, mounts #root
-package.json                         deps per docs/01 §1; scripts below
-tsconfig.json                        strict, noEmit, react-jsx, types vite/client+node
-vite.config.ts                       app build (base './' for static hosting)
-vitest.config.ts                     unit tests, node env, plugin-free (see note)
-eslint.config.js  .prettierrc.json   lint/format
-playwright.config.ts                 e2e, chromium, builds+previews on :4173
-.github/workflows/ci.yml             format:check -> lint -> typecheck -> test -> build
-src/main.tsx  src/App.tsx            React entry + app shell
-src/ui/theme.css                     workspace palette tokens (docs/09 §9)
-tests/smoke.test.ts                  harness proof
-tests/e2e/shell.spec.ts              shell loads
+CLAUDE.md  README.md  docs/            charter, public docs, spec + live state
+index.html                             SPA entry (inline SVG favicon)
+package.json  tsconfig.json            deps per docs/01 §1 + @fontsource/*, vite-plugin-pwa
+vite.config.ts                         app build, base './', PWA manifest + workbox
+vitest.config.ts                       unit tests, node env, plugin-free (note below)
+eslint.config.js .prettierrc.json      lint/format
+playwright.config.ts                   e2e (build + preview on :4173)
+public/icon-{192,512}.png              app icons (generated)
+.github/workflows/ci.yml               format → lint → typecheck → test → build
+.github/workflows/deploy.yml           Pages deploy + CNAME monet.mouftools.com
+
+src/core/                              PURE: no DOM, no React, all unit-tested
+  model/{types,document,commands}.ts   canonical shapes, auto-layering, undo commands
+  raster/{pixels,stamp,floodfill,transform,crisp}.ts
+  color/{convert,palette}.ts           HSL/HSV/hex, MS-Paint 20
+  shapes/{geometry,spline,transformOps}.ts  contours, Catmull-Rom, handle scaling
+  noise/{fields,apply}.ts              13 fields from one hash, brightness/hue apply
+  recolor/{replace,tint}.ts
+  io/{monetFile,ico,bmp,pdfFit,pdfExport}.ts
+
+src/engine/                            DOM-facing rendering
+  renderer.ts                          rAF loop gated on invalidate; surround, checker,
+                                       grid, 3×3 tiling, overlays
+  compose.ts                           the compositor (shared by viewport, export, flatten)
+  layerCache.ts                        layer id → canvas cache + imageDataFrom
+  drawObjects.ts paths.ts textLayout.ts objectChrome.ts hitTest.ts
+  viewport.ts exporters.ts
+
+src/tools/                             one module per tool over a common interface
+  registry.ts index.ts types.ts        registration; unknown ids degrade to a no-op
+  strokeEngine.ts brushTools.ts bucketTool.ts eyedropperTool.ts
+  selectTool.ts marquee.ts shapeTool.ts textTool.ts panTool.ts
+
+src/app/                               stores + action layer
+  docStore viewStore toolStore settingsStore    zustand
+  bus.ts                               invalidate + toast fan-out
+  fileActions exportActions editActions selectionActions canvasActions
+  adjustSession.ts                     shared preview/bake for noise + recolour
+  autosave.ts debugBridge.ts
+
+src/integrations/
+  sources.ts sourceSave.ts             provider façade + `.monet` mirror path
+  github/{api,repoSource}.ts           REST wrapper; connect/browse/commit+push/sync
+  jar/jarSource.ts                     jszip + IndexedDB cache, mcmeta badges
+  fsa/{localFile,folderSource}.ts      pickers with download fallback; folder source
+  idb.ts                               idb-keyval wrappers + autosave store
+
+src/ui/                                React; no business logic
+  App.tsx TopBar AppMenu DocTabs Workspace StatusBar OptionsPanel ColorPanel
+  SourcesSidebar TextEditOverlay UpdatePrompt sceneHooks useShortcuts fonts theme.css
+  panels/{Brushes,Shapes,Text,Canvas,Noise,Recolour}Panel.tsx
+  controls/{Slider,ColorField}.tsx
+  dialogs/{Dialog,NewDoc,Resize,Export,SaveAs,ConnectRepo,Sync,Settings,Recover,Confirm,Shortcuts}
+
+tests/                                 vitest specs; manual/ = the GUI harness
 ```
 
-Scripts: `dev` · `build` (tsc -b && vite build) · `preview` · `typecheck` · `lint` ·
-`format`/`format:check` · `test` (vitest run) · `test:watch` · `e2e`.
+## The GUI harness (owner request 2026-08-09)
 
-Note: vitest 2 bundles vite 5, whose `Plugin` type is incompatible with vite 6's, so
-unit tests use a **separate plugin-free `vitest.config.ts`**. Legitimate because
-tests only cover `src/core` (pure TS, no JSX/DOM) per the docs/01 §2 dependency rule.
+`tests/manual/harness.{mjs,sh}` runs Vite's dev server, a real browser and a scenario in one
+process; it screenshots each step, builds a **contact sheet** of the whole flow, and reads app
+state back through `src/app/debugBridge.ts` (`window.__monet`: doc, stack, stores, `countColor`,
+`pixelAt`). `npm run harness`; usage in `tests/manual/README.md`. `--headed` wraps the run in
+`xvfb-run`. Scenarios assert on real pixels and store values, not on screenshots.
 
-### Deviations from the spec's module list (docs/01 §2), with reasons
+Scenarios: `smoke` · `full` · `layering` (the owner's scenario) · `text` · `selection` ·
+`canvas` · `noise` · `recolour` · `export` · `save` · `sources` (GitHub against a mocked API).
 
-- **Canvas-backed exporters live in `engine/exporters.ts`**, not `core/io/exporters.ts`:
-  they need a real canvas encoder, and `core` is required to stay DOM-free. Byte-level
-  writers (`.monet`, and later ICO/BMP/PDF) remain pure in `core/io`.
-- **`core/raster/crisp.ts` holds only the pure alpha-threshold pass**; the
-  draw-to-offscreen part lives in `engine/drawObjects.ts` for the same reason.
-- **`engine/textLayout.ts`** exists because text layout needs `measureText`.
-- **Tools are registered** through `tools/registry.ts` + `tools/index.ts` rather than a
-  static map, so unimplemented ids degrade to a no-op instead of breaking the build.
-- **`vitest.config.ts` is separate** from `vite.config.ts` (see note above).
-- **`integrations/sources.ts`** is a provider façade (registry + `SourceProvider`
-  interface) so `fileActions` never branches on jar/folder/repo.
+CI runs unit tests + build, not the harness or Playwright (no browser in the runner).
 
-### Invariants worth knowing before editing
+## Deviations from the spec's module list (docs/01 §2), with reasons
 
-- Zustand selectors must not allocate: returning a fresh object/array every call breaks
-  referential equality and re-renders forever (React error #185). Read stored values and
-  default *outside* the selector.
-- `RasterLayer.pixels` is the only truth for raster content; canvases in `layerCache`
-  are caches, patched via `patchLayer` after every mutation.
-- Every document mutation goes through `docStore.execute(cmd)`; tools that mutate pixels
-  directly must hand the command a `before` snapshot and let `execute` replay it.
-- ImageData construction goes through `layerCache.imageDataFrom` (one deliberate cast at
-  the DOM boundary).
+- **Canvas-backed exporters live in `engine/exporters.ts`**, not `core/io/exporters.ts`: they
+  need a real canvas encoder and `core` must stay DOM-free. Byte-level writers (`.monet`, ICO,
+  BMP, PDF fit) stay pure in `core/io`.
+- **`core/raster/crisp.ts`** holds only the pure alpha-threshold pass; drawing to an offscreen
+  lives in `engine/drawObjects.ts`.
+- **`engine/textLayout.ts`** exists because layout needs `measureText`.
+- **Tools register** through `tools/registry.ts` + `tools/index.ts` rather than a static map.
+- **`vitest.config.ts` is separate** from `vite.config.ts`: vitest 2 bundles vite 5, whose
+  `Plugin` type clashes with vite 6's. Legitimate because tests only cover `src/core`.
+- **`integrations/sources.ts`** is a provider façade so `fileActions` never branches on
+  jar/folder/repo.
+- **`app/adjustSession.ts`** is shared preview/bake infrastructure the spec described twice
+  (docs/04 §6 and docs/05 §5).
+- **Fonts** are `@fontsource` packages (Silkscreen default), not Monocraft — docs/03 §6.2.
+- **Checkerboard** lightened to `#ffffff`/`#d4d4d4` — docs/01 §4 step 3.
 
-### GUI harness (owner request 2026-08-09)
+## Invariants worth knowing before editing
 
-`tests/manual/harness.mjs` + `harness.sh` drive the real app in a real browser, screenshot
-each step, build a **contact sheet** of the whole interaction, and read app state back out of
-the page through `src/app/debugBridge.ts` (`window.__monet`: document, stack, stores,
-`countColor`, `pixelAt`). Scenarios live in `tests/manual/scenarios/*.mjs`; full usage in
-`tests/manual/README.md`. `npm run harness`. Everything runs in one process because detached
-processes do not survive between agent shell calls; `--headed` wraps the run in `xvfb-run`.
-
-Assert on `state.*` (real pixels and real store values), not on screenshots.
-
-Next: M6 — selection lifecycle, clipboard, flatten.
-
-## Target shape (one-paragraph summary; authoritative detail in the spec)
-
-Vite/React/TS SPA, Canvas 2D. `src/core` = pure DOM-free algorithms (pixels,
-floodfill, colour, geometry, noise, recolour, encoders, `.monet` zip I/O);
-`src/engine` = compositor + viewport + pointer routing with per-layer canvas
-caches; `src/tools` = one module per tool over a common interface; `src/ui` =
-React panels (Paint-3D layout: feature tabs top, options right, sources left);
-`src/integrations` = GitHub REST (PAT; branch-per-repo `monet`; one commit+push
-per save; ff Sync with merge fallback), jar parsing (jszip + IndexedDB cache),
-File System Access folders. Document model = interleaved stack of raster paint
-layers and live shape/text objects with auto-layering (no layers UI); undo =
-command pattern (200 steps); persistence = `.monet` zip (manifest JSON + raw RGBA
-layers); PWA shell from M12.
+- **Zustand selectors must not allocate.** A fresh object or array per call breaks referential
+  equality and re-renders forever (React error #185). Read stored values and apply defaults
+  *outside* the selector.
+- `RasterLayer.pixels` is the only truth for raster content; canvases in `layerCache` are
+  caches, patched via `patchLayer` after every mutation.
+- Every document mutation goes through `docStore.execute(cmd)`. Tools that mutate pixels
+  directly build the command with a `before` snapshot, call `cmd.undo(doc)` to rewind, then
+  `execute` it — so history and the live document can never disagree.
+- ImageData construction goes through `layerCache.imageDataFrom` (one deliberate cast at the
+  DOM boundary).
+- `isTypingTarget` must match only real text entry: counting checkboxes and sliders as typing
+  silently disables every keyboard shortcut.
+- The async clipboard and the File System Access pickers can **hang rather than reject** — they
+  wait on permission UI that may never appear. Race them against a timeout and keep a fallback.
+- A lifted floating selection has already been cleared from its layers, so anything that ends a
+  selection must **anchor** it, never discard it.
+- Adjustment sessions must `resyncAdjust()` when the document changes underneath them, or
+  previews outlive the pixels they were derived from.
+- The text editing overlay commits on a real outside click, not on blur: the pointer-up that
+  places the text moves focus to `<body>`, and committing there would delete it.
