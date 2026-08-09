@@ -9,6 +9,7 @@ import { ensureTopRasterLayer } from '../core/model/document';
 import { floodFill, toleranceToThreshold } from '../core/raster/floodfill';
 import { blendOver } from '../core/raster/pixels';
 import { compositePixels } from '../engine/compose';
+import { activeRenderer } from '../engine/renderer';
 import { useDocStore } from '../app/docStore';
 import { useToolStore } from '../app/toolStore';
 import { getComposeOpts } from '../ui/sceneHooks';
@@ -25,7 +26,7 @@ export const bucketTool: Tool = {
     if (!doc) return;
 
     const ts = useToolStore.getState();
-    const pick = compositePixels(doc, getComposeOpts());
+    const pick = activeRenderer()?.compositeSnapshot() ?? compositePixels(doc, getComposeOpts());
     const region = floodFill(
       pick,
       doc.width,

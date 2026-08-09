@@ -3,7 +3,7 @@
  * invalidate flag: nothing is drawn unless something changed.
  */
 import type { MonetDoc } from '../core/model/types';
-import { ctx2d, makeCanvas } from './layerCache';
+import { ctx2d, ctx2dDraw, makeCanvas } from './layerCache';
 import { drawDocument, type ComposeOpts } from './compose';
 import type { View } from './viewport';
 import { themeColors } from './themeColors';
@@ -42,31 +42,43 @@ export class Renderer {
   private ctx: CanvasRenderingContext2D;
   private composite = makeCanvas(1, 1);
   private compositeCtx = ctx2d(this.composite);
+  private snapshot: Uint8ClampedArray | null = null;
   private pattern: CanvasPattern | null = null;
   private raf = 0;
   private dirty = true;
   private compositeDirty = true;
   cssW = 0;
   cssH = 0;
+  /** Frame cost, for the harness's perf scenario. Cheap enough to leave on. */
+  readonly stats = { frames: 0, totalMs: 0, maxMs: 0, lastMs: 0, composites: 0 };
 
   constructor(
     private canvas: HTMLCanvasElement,
     private getScene: () => Scene,
   ) {
-    this.ctx = ctx2d(canvas);
+    this.ctx = ctx2dDraw(canvas);
   }
 
   /** Redraw next frame. `content` also re-composites the document. */
   invalidate(content = true) {
     this.dirty = true;
-    if (content) this.compositeDirty = true;
+    if (content) {
+      this.compositeDirty = true;
+      this.snapshot = null;
+    }
   }
 
   start() {
     const loop = () => {
       if (this.dirty) {
         this.dirty = false;
+        const t0 = performance.now();
         this.draw();
+        const ms = performance.now() - t0;
+        this.stats.frames += 1;
+        this.stats.totalMs += ms;
+        this.stats.lastMs = ms;
+        if (ms > this.stats.maxMs) this.stats.maxMs = ms;
       }
       this.raf = requestAnimationFrame(loop);
     };
@@ -88,12 +100,17 @@ export class Renderer {
     this.invalidate();
   }
 
-  /** The 1:1 composite of the current scene — eyedropper and bucket read this. */
+  /**
+   * The 1:1 composite of the current scene — eyedropper and bucket read this instead of
+   * recompositing. Cached until the next content invalidation, so sampling while dragging
+   * costs one readback per change rather than one per pointer event.
+   */
   compositeSnapshot(): Uint8ClampedArray | null {
     const { doc } = this.getScene();
     if (!doc) return null;
     this.ensureComposite(doc);
-    return this.compositeCtx.getImageData(0, 0, doc.width, doc.height).data;
+    this.snapshot ??= this.compositeCtx.getImageData(0, 0, doc.width, doc.height).data;
+    return this.snapshot;
   }
 
   private ensureComposite(doc: MonetDoc) {
@@ -101,8 +118,10 @@ export class Renderer {
       this.composite = makeCanvas(doc.width, doc.height);
       this.compositeCtx = ctx2d(this.composite);
       this.compositeDirty = true;
+      this.snapshot = null;
     }
     if (!this.compositeDirty) return;
+    this.stats.composites += 1;
     const c = this.compositeCtx;
     c.setTransform(1, 0, 0, 1, 0, 0);
     c.imageSmoothingEnabled = false;
@@ -213,3 +232,13 @@ export class Renderer {
     ctx.restore();
   }
 }
+
+/**
+ * The live renderer, so anything that wants the current composite can borrow its cached one
+ * (`compositeSnapshot`) instead of building another. Registered by `ui/Workspace`; null before
+ * mount and in unit tests, so every caller needs a fallback path.
+ */
+let current: Renderer | null = null;
+
+export const setActiveRenderer = (r: Renderer | null) => void (current = r);
+export const activeRenderer = () => current;

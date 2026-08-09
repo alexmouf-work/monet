@@ -24,13 +24,23 @@ interface Group {
 }
 
 export function Toolbar({ actions }: { actions: MenuActions }) {
-  const ds = useDocStore();
-  const vs = useViewStore();
+  // Narrow selectors on purpose. Subscribing to whole stores re-rendered all 21 buttons on
+  // every pan and wheel event, which is the kind of thing that reads as "the app is laggy".
+  const hasDoc = useDocStore((s) => s.activeId !== null);
+  const hasSelection = useDocStore((s) => s.selection !== null);
+  const hasObject = useDocStore((s) => s.selectedObjectId !== null);
+  const undoDepth = useDocStore((s) => (s.activeId ? (s.histories[s.activeId]?.undo.length ?? 0) : 0));
+  const redoDepth = useDocStore((s) => (s.activeId ? (s.histories[s.activeId]?.redo.length ?? 0) : 0));
+  const grid = useViewStore((s) => s.grid);
+  const tiling = useViewStore((s) => s.tiling);
   const theme = useSettingsStore((s) => s.theme);
   const setTheme = useSettingsStore((s) => s.setTheme);
-  const doc = ds.activeId ? ds.docs[ds.activeId] : null;
-  const hasDoc = !!doc;
-  const hasSelection = !!ds.selection;
+
+  /** Actions are stable; read them at click time so the toolbar needn't subscribe to them. */
+  const withDoc = (fn: (id: string, w: number, h: number) => void) => () => {
+    const doc = useDocStore.getState().active();
+    if (doc) fn(doc.id, doc.width, doc.height);
+  };
 
   const groups: Group[] = [
     {
@@ -45,19 +55,34 @@ export function Toolbar({ actions }: { actions: MenuActions }) {
     {
       label: 'History',
       items: [
-        { icon: '↶', title: 'Undo (Ctrl+Z)', run: ds.undo, disabled: !ds.canUndo() },
-        { icon: '↷', title: 'Redo (Ctrl+Y)', run: ds.redo, disabled: !ds.canRedo() },
+        {
+          icon: '↶',
+          title: 'Undo (Ctrl+Z)',
+          run: () => useDocStore.getState().undo(),
+          disabled: !undoDepth,
+        },
+        {
+          icon: '↷',
+          title: 'Redo (Ctrl+Y)',
+          run: () => useDocStore.getState().redo(),
+          disabled: !redoDepth,
+        },
       ],
     },
     {
       label: 'Clipboard',
       items: [
-        { icon: '⧉', title: 'Copy (Ctrl+C)', run: () => void copySelection(), disabled: !hasDoc },
+        {
+          icon: '⧉',
+          title: 'Copy (Ctrl+C)',
+          run: () => void copySelection(),
+          disabled: !hasSelection && !hasObject,
+        },
         {
           icon: '✂',
           title: 'Cut (Ctrl+X)',
           run: () => void cutSelection(),
-          disabled: !hasSelection,
+          disabled: !hasSelection && !hasObject,
         },
         { icon: '⎘', title: 'Paste (Ctrl+V)', run: () => void pasteClipboard() },
       ],
@@ -115,26 +140,26 @@ export function Toolbar({ actions }: { actions: MenuActions }) {
         {
           icon: '⤡',
           title: 'Fit to window (Ctrl+0)',
-          run: () => doc && vs.fit(doc.id, doc.width, doc.height),
+          run: withDoc((id, w, h) => useViewStore.getState().fit(id, w, h)),
           disabled: !hasDoc,
         },
         {
           icon: '1:1',
           title: 'Actual size (Ctrl+1)',
-          run: () => doc && vs.hundred(doc.id, doc.width, doc.height),
+          run: withDoc((id, w, h) => useViewStore.getState().hundred(id, w, h)),
           disabled: !hasDoc,
         },
         {
           icon: '▦',
-          title: `Pixel grid: ${vs.grid} (G)`,
-          run: vs.cycleGrid,
-          active: vs.grid === 'on',
+          title: `Pixel grid: ${grid} (G)`,
+          run: () => useViewStore.getState().cycleGrid(),
+          active: grid === 'on',
         },
         {
           icon: '⊞',
           title: 'Tiling preview (Ctrl+T)',
-          run: vs.toggleTiling,
-          active: vs.tiling,
+          run: () => useViewStore.getState().toggleTiling(),
+          active: tiling,
           disabled: !hasDoc,
         },
       ],

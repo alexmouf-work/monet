@@ -103,6 +103,8 @@ const state = {
   editingTextId: () => page.evaluate(() => window.__monet.editingTextId()),
   countColor: (hex, tol) => page.evaluate(([h, t]) => window.__monet.countColor(h, t), [hex, tol]),
   pixelAt: (x, y) => page.evaluate(([x2, y2]) => window.__monet.pixelAt(x2, y2), [x, y]),
+  perf: () => page.evaluate(() => window.__monet.perf()),
+  resetPerf: () => page.evaluate(() => window.__monet.resetPerf()),
 };
 
 /** Canvas-relative helpers: fractional coordinates, doc pixel coordinates, drags. */

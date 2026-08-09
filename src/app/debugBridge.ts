@@ -11,6 +11,7 @@ import { useToolStore } from './toolStore';
 import { useViewStore } from './viewStore';
 import { useSettingsStore } from './settingsStore';
 import { compositePixels } from '../engine/compose';
+import { activeRenderer } from '../engine/renderer';
 import { getComposeOpts } from '../ui/sceneHooks';
 import { editingTextId } from '../tools/textTool';
 
@@ -22,6 +23,9 @@ export interface MonetDebug {
   /** Count of pixels matching a hex colour (± tolerance) in the flattened composite. */
   countColor(hex: string, tolerance?: number): number;
   pixelAt(x: number, y: number): [number, number, number, number] | null;
+  /** Renderer frame costs since the last `resetPerf()` — the perf scenario's measuring stick. */
+  perf(): { frames: number; totalMs: number; avgMs: number; maxMs: number; composites: number };
+  resetPerf(): void;
 }
 
 export function installDebugBridge(): void {
@@ -100,6 +104,26 @@ export function installDebugBridge(): void {
           count++;
       }
       return count;
+    },
+    perf() {
+      const s = activeRenderer()?.stats;
+      if (!s) return { frames: 0, totalMs: 0, avgMs: 0, maxMs: 0, composites: 0 };
+      return {
+        frames: s.frames,
+        totalMs: Math.round(s.totalMs * 100) / 100,
+        avgMs: s.frames ? Math.round((s.totalMs / s.frames) * 100) / 100 : 0,
+        maxMs: Math.round(s.maxMs * 100) / 100,
+        composites: s.composites,
+      };
+    },
+    resetPerf() {
+      const s = activeRenderer()?.stats;
+      if (!s) return;
+      s.frames = 0;
+      s.totalMs = 0;
+      s.maxMs = 0;
+      s.lastMs = 0;
+      s.composites = 0;
     },
     pixelAt(x, y) {
       const d = useDocStore.getState().active();

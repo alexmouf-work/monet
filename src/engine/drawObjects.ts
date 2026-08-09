@@ -10,9 +10,20 @@ import { ctx2d, makeCanvas } from './layerCache';
 import { docPath } from './paths';
 import { alignOffset, fontString, layoutText } from './textLayout';
 
-/** Sizes a scratch canvas to the document and clears it. */
+/**
+ * Sizes the shared scratch canvas to the document and clears it. Reused rather than allocated:
+ * crisp mode runs one pass per colour per object per frame, so allocating here meant a fresh
+ * doc-sized canvas several times a frame while dragging a shape.
+ */
+let scratchCanvas: HTMLCanvasElement | null = null;
+
 function scratch(w: number, h: number): CanvasRenderingContext2D {
-  const ctx = ctx2d(makeCanvas(w, h));
+  if (!scratchCanvas || scratchCanvas.width !== w || scratchCanvas.height !== h) {
+    scratchCanvas = makeCanvas(w, h);
+  }
+  const ctx = ctx2d(scratchCanvas);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalAlpha = 1;
   ctx.clearRect(0, 0, w, h);
   return ctx;
 }

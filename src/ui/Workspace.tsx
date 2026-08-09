@@ -4,7 +4,7 @@ import { useDocStore } from '../app/docStore';
 import { useViewStore } from '../app/viewStore';
 import { useToolStore } from '../app/toolStore';
 import { onInvalidate } from '../app/bus';
-import { Renderer, type Scene } from '../engine/renderer';
+import { Renderer, setActiveRenderer, type Scene } from '../engine/renderer';
 import { docFromScreen, wheelFactor } from '../engine/viewport';
 import { getTool } from '../tools';
 import type { ToolPointerEvent } from '../tools/types';
@@ -44,6 +44,7 @@ export function Workspace() {
 
     const renderer = new Renderer(canvas, getScene);
     rendererRef.current = renderer;
+    setActiveRenderer(renderer);
     renderer.start();
 
     const ro = new ResizeObserver(() => {
@@ -60,10 +61,26 @@ export function Workspace() {
 
     const off = onInvalidate((content) => renderer.invalidate(content));
 
+    // Native listener, not React's onWheel: React registers wheel at the root as **passive**,
+    // so preventDefault() there is ignored ("Unable to preventDefault inside passive event
+    // listener") and the page keeps its own scroll/zoom while you are zooming the canvas.
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const doc = useDocStore.getState().active();
+      if (!doc) return;
+      const r = canvas.getBoundingClientRect();
+      useViewStore
+        .getState()
+        .zoomAt(doc.id, { x: e.clientX - r.left, y: e.clientY - r.top }, wheelFactor(e.deltaY));
+    };
+    canvas.addEventListener('wheel', onWheel, { passive: false });
+
     return () => {
+      canvas.removeEventListener('wheel', onWheel);
       off();
       ro.disconnect();
       renderer.stop();
+      setActiveRenderer(null);
       rendererRef.current = null;
     };
   }, []);
@@ -164,19 +181,6 @@ export function Workspace() {
           dragToolRef.current = null;
         }}
         onPointerLeave={() => reportCursor(null, null)}
-        onWheel={(e) => {
-          e.preventDefault();
-          const doc = useDocStore.getState().active();
-          if (!doc) return;
-          const rect = canvasRef.current!.getBoundingClientRect();
-          useViewStore
-            .getState()
-            .zoomAt(
-              doc.id,
-              { x: e.clientX - rect.left, y: e.clientY - rect.top },
-              wheelFactor(e.deltaY),
-            );
-        }}
         onDoubleClick={() => {
           // Double-click finishes a spline, or re-opens a selected text object for editing.
           if (splineInProgress()) {
@@ -224,10 +228,20 @@ export const isTypingTarget = (t: EventTarget | null) => {
 /** Cursor doc coordinates for the status bar, kept out of React state for cheapness. */
 let cursorPos: { x: number; y: number } | null = null;
 const cursorListeners = new Set<() => void>();
+let cursorFlush = 0;
 
+/**
+ * Notifications are coalesced to one per frame. A high-polling mouse fires pointermove far
+ * faster than 60 Hz, and each notification re-renders the status bar — so the uncoalesced
+ * version spent hundreds of React renders a second on a coordinate readout.
+ */
 function reportCursor(x: number | null, y: number | null) {
   cursorPos = x == null || y == null ? null : { x: Math.floor(x), y: Math.floor(y) };
-  for (const fn of cursorListeners) fn();
+  if (cursorFlush) return;
+  cursorFlush = requestAnimationFrame(() => {
+    cursorFlush = 0;
+    for (const fn of cursorListeners) fn();
+  });
 }
 
 export function subscribeCursor(fn: () => void) {

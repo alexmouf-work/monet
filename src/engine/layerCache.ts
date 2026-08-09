@@ -20,8 +20,24 @@ export function makeCanvas(w: number, h: number): HTMLCanvasElement {
   return c;
 }
 
+/**
+ * For buffers we read back with `getImageData` — layer caches, scratch canvases, the
+ * composite. `willReadFrequently` asks the browser for a CPU-backed surface, which makes
+ * readback cheap.
+ */
 export function ctx2d(c: HTMLCanvasElement): CanvasRenderingContext2D {
   const ctx = c.getContext('2d', { willReadFrequently: true });
+  if (!ctx) throw new Error('2D canvas context unavailable');
+  return ctx;
+}
+
+/**
+ * For canvases that are only ever *drawn*, above all the on-screen one. Passing
+ * `willReadFrequently` there opts the visible canvas out of GPU acceleration for every
+ * frame — the single most expensive thing this app can do to itself.
+ */
+export function ctx2dDraw(c: HTMLCanvasElement): CanvasRenderingContext2D {
+  const ctx = c.getContext('2d');
   if (!ctx) throw new Error('2D canvas context unavailable');
   return ctx;
 }

@@ -31,7 +31,11 @@ interface Live {
   w: number;
   h: number;
   cov: Float32Array;
+  /** Everything the stroke has touched — the rect the final command commits. */
   dirty: Rect | null;
+  /** Touched since the last overlay upload. Keeps the per-event upload proportional to the
+   *  movement rather than to the whole stroke so far. */
+  pending: Rect | null;
   tip: TipMask;
   kind: StrokeKind;
   /** rgb of the stroke; unused for erase. */
@@ -72,6 +76,7 @@ export function beginStroke(opts: {
     h: doc.height,
     cov: new Float32Array(doc.width * doc.height),
     dirty: null,
+    pending: null,
     tip: tipFor(opts.size, opts.shape, opts.graded),
     kind: opts.kind,
     rgb: hexToRgb(color),
@@ -101,7 +106,9 @@ function stamp(px: number, py: number) {
       if (m > cov[i]) cov[i] = m;
     }
   }
-  live.dirty = unionRect(live.dirty, { x: o.x, y: o.y, w: tip.size, h: tip.size });
+  const touched = { x: o.x, y: o.y, w: tip.size, h: tip.size };
+  live.dirty = unionRect(live.dirty, touched);
+  live.pending = unionRect(live.pending, touched);
 }
 
 function stampAt(p: { x: number; y: number }, graded: boolean) {
@@ -123,10 +130,15 @@ export function extendStroke(at: { x: number; y: number }, graded: boolean): voi
   paintOverlay();
 }
 
-/** Rebuilds the scratch canvas over the dirty rect so the renderer can preview the stroke. */
+/**
+ * Rebuilds the scratch canvas over the newly touched rect so the renderer can preview the
+ * stroke. Uploading the *cumulative* rect instead made every pointer event cost the whole
+ * area painted so far — a long stroke degraded as it went.
+ */
 function paintOverlay() {
   if (!live) return;
-  const r = clampToDoc(live.dirty, live.w, live.h);
+  const r = clampToDoc(live.pending, live.w, live.h);
+  live.pending = null;
   if (!r) return;
   const buf = new Uint8ClampedArray(r.w * r.h * 4);
   const { cov, rgb, alpha, kind, w } = live;

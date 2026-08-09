@@ -4,6 +4,7 @@
  */
 import { rgbToHex } from '../core/color/convert';
 import { compositePixels } from '../engine/compose';
+import { activeRenderer } from '../engine/renderer';
 import { useDocStore } from '../app/docStore';
 import { useToolStore } from '../app/toolStore';
 import { getComposeOpts } from '../ui/sceneHooks';
@@ -16,7 +17,9 @@ export function pickColorAt(x: number, y: number): { hex: string; alpha: number 
   const px = Math.floor(x);
   const py = Math.floor(y);
   if (px < 0 || py < 0 || px >= doc.width || py >= doc.height) return null;
-  const data = compositePixels(doc, getComposeOpts());
+  // The renderer already holds this frame's composite; recompositing per pointer event made
+  // dragging the eyedropper cost a full re-render of the stack for every sample.
+  const data = activeRenderer()?.compositeSnapshot() ?? compositePixels(doc, getComposeOpts());
   const i = (py * doc.width + px) * 4;
   const alpha = data[i + 3] / 255;
   return { hex: rgbToHex(data[i], data[i + 1], data[i + 2]), alpha };
