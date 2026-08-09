@@ -1,0 +1,13 @@
+import { chromium } from '@playwright/test';
+const b = await chromium.launch({ executablePath: process.env.CHROME_PATH });
+const p = await b.newPage({ viewport: { width: 1280, height: 1000 }, deviceScaleFactor: 2 });
+p.on('response', (r) => { if (r.status() >= 400) console.log('  HTTP', r.status(), r.url()); });
+p.on('pageerror', (e) => console.log('  PAGEERROR', e.message));
+await p.goto('http://127.0.0.1:4400/', { waitUntil: 'networkidle' });
+await p.waitForTimeout(1200);
+const card = p.locator('.card[aria-label^="Monet"]');
+await card.scrollIntoViewIfNeeded();
+await p.waitForTimeout(400);
+await card.screenshot({ path: process.argv[2] });
+await p.screenshot({ path: process.argv[2].replace('.png','-page.png'), fullPage: true });
+await b.close();
