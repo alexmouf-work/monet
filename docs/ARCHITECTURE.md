@@ -30,7 +30,33 @@ Note: vitest 2 bundles vite 5, whose `Plugin` type is incompatible with vite 6's
 unit tests use a **separate plugin-free `vitest.config.ts`**. Legitimate because
 tests only cover `src/core` (pure TS, no JSX/DOM) per the docs/01 §2 dependency rule.
 
-Next: M1 — document model, compositor, viewport, doc tabs.
+### Deviations from the spec's module list (docs/01 §2), with reasons
+
+- **Canvas-backed exporters live in `engine/exporters.ts`**, not `core/io/exporters.ts`:
+  they need a real canvas encoder, and `core` is required to stay DOM-free. Byte-level
+  writers (`.monet`, and later ICO/BMP/PDF) remain pure in `core/io`.
+- **`core/raster/crisp.ts` holds only the pure alpha-threshold pass**; the
+  draw-to-offscreen part lives in `engine/drawObjects.ts` for the same reason.
+- **`engine/textLayout.ts`** exists because text layout needs `measureText`.
+- **Tools are registered** through `tools/registry.ts` + `tools/index.ts` rather than a
+  static map, so unimplemented ids degrade to a no-op instead of breaking the build.
+- **`vitest.config.ts` is separate** from `vite.config.ts` (see note above).
+- **`integrations/sources.ts`** is a provider façade (registry + `SourceProvider`
+  interface) so `fileActions` never branches on jar/folder/repo.
+
+### Invariants worth knowing before editing
+
+- Zustand selectors must not allocate: returning a fresh object/array every call breaks
+  referential equality and re-renders forever (React error #185). Read stored values and
+  default *outside* the selector.
+- `RasterLayer.pixels` is the only truth for raster content; canvases in `layerCache`
+  are caches, patched via `patchLayer` after every mutation.
+- Every document mutation goes through `docStore.execute(cmd)`; tools that mutate pixels
+  directly must hand the command a `before` snapshot and let `execute` replay it.
+- ImageData construction goes through `layerCache.imageDataFrom` (one deliberate cast at
+  the DOM boundary).
+
+Next: M3 — colour panel, eyedropper, marker settings, bucket flood fill.
 
 ## Target shape (one-paragraph summary; authoritative detail in the spec)
 

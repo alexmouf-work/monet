@@ -625,3 +625,119 @@ input[type='text'] {
 .toast--error {
   background: #8f2b2b;
 }
+
+/* ---------- app menu ---------- */
+
+.menu {
+  position: absolute;
+  top: var(--topbar-h);
+  left: 6px;
+  z-index: 40;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 14px 40px rgb(0 0 0 / 0.22);
+  padding: 6px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(220px, 1fr));
+  gap: 4px 10px;
+  max-height: calc(100vh - var(--topbar-h) - 20px);
+  overflow: auto;
+}
+
+.menu__title {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+  padding: 6px 8px 2px;
+}
+
+.menu__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  background: none;
+  border: none;
+  border-radius: 5px;
+  padding: 5px 8px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.menu__item:hover:not(:disabled) {
+  background: var(--accent-soft);
+}
+
+.menu__item:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+kbd {
+  font: inherit;
+  font-size: 10px;
+  color: var(--text-dim);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 5px;
+  white-space: nowrap;
+}
+
+/* ---------- recover + shortcuts ---------- */
+
+.recover__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.recover__thumb {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  image-rendering: pixelated;
+  background: var(--panel);
+  flex: none;
+}
+
+.recover__name {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.recover__name small {
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.shortcuts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+}
+
+.shortcuts h3 {
+  margin: 0 0 4px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+}
+
+.shortcuts table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.shortcuts td {
+  padding: 2px 6px 2px 0;
+  vertical-align: top;
+  font-size: 12px;
+}
