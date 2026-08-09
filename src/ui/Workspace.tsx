@@ -193,11 +193,32 @@ export function Workspace() {
   );
 }
 
+/** Input types that swallow keystrokes. Checkboxes, ranges and colour wells do not. */
+const TEXT_INPUT_TYPES = new Set([
+  'text',
+  'number',
+  'search',
+  'email',
+  'url',
+  'tel',
+  'password',
+  'date',
+  'time',
+]);
+
+/**
+ * True when the event target is genuinely typing text, so global shortcuts should stand
+ * aside. Sliders, checkboxes and colour wells are inputs too — treating them as text entry
+ * silently killed every shortcut after touching a slider.
+ */
 export const isTypingTarget = (t: EventTarget | null) => {
   const el = t as HTMLElement | null;
   if (!el) return false;
+  if (el.isContentEditable) return true;
   const tag = el.tagName;
-  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable;
+  if (tag === 'TEXTAREA' || tag === 'SELECT') return true;
+  if (tag !== 'INPUT') return false;
+  return TEXT_INPUT_TYPES.has(((el as HTMLInputElement).type || 'text').toLowerCase());
 };
 
 /** Cursor doc coordinates for the status bar, kept out of React state for cheapness. */
