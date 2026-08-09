@@ -82,13 +82,17 @@ state back through `src/app/debugBridge.ts` (`window.__monet`: doc, stack, store
 Scenarios: `smoke` · `full` · `layering` (the owner's scenario) · `text` · `selection` ·
 `canvas` · `noise` · `recolour` · `export` · `save` · `sources` (GitHub against a mocked API) ·
 `theme` (toolbar wiring, brush cursor, theme cycling + persistence) · `perf` (frame and
-handler costs).
+handler costs) · `eyedropper-shapes-clipboard` (the three 2026-08-09 owner requests).
 
 `shot()` waits two `requestAnimationFrame`s before capturing. A full-page screenshot taken
 immediately after a CSS-only change (a theme toggle) can otherwise return the *previous*
 compositor frame — which reads as "the feature is broken" when it is not (seen 2026-08-09).
 
-CI runs unit tests + build, not the harness or Playwright (no browser in the runner).
+**CI is `workflow_dispatch` only** (owner directive 2026-08-09: Actions storage full). Nothing
+in `.github/` deploys — Vercel's Git integration does — and the same gates run locally before
+each commit, so the workflow existed only to repeat them. `cache: npm` was dropped with it: each
+run wrote a fresh cache entry. Run it from the Actions tab for a clean-room check. It would not
+run the harness or Playwright anyway (no browser in the runner).
 
 ## Hosting (Vercel, owner decision 2026-08-09)
 
@@ -184,6 +188,11 @@ submission, not GPU rasterisation.
   selection must **anchor** it, never discard it.
 - Adjustment sessions must `resyncAdjust()` when the document changes underneath them, or
   previews outlive the pixels they were derived from.
+- Geometry of one colour that overlaps itself must be composited **once** (`singlePass`, or a
+  single crisp pass). Two passes double-blend the overlap, which shows as a darker seam at any
+  alpha below 1.
+- The clipboard holds either pixels or an object. When both could apply, the system clipboard
+  wins **unless** its bytes are the PNG we last wrote — that is our own object copy returning.
 - The text editing overlay commits on a real outside click, not on blur: the pointer-up that
   places the text moves focus to `<body>`, and committing there would delete it.
 - **No chrome colour may exist only inside a `@media` or `[data-theme]` block.** Every token

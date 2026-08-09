@@ -72,5 +72,8 @@ pick up exactly where you left off without asking further questions.
   `docs/CONTEXT.md` — do not relitigate them.
 - Deploy target: **Vercel** (owner decision 2026-08-09), static output of `dist/`, domain
   `monet.mouftools.com`. `vercel.json` holds the preset and cache headers; deploys come from
-  Vercel's Git integration, so there is no deploy workflow in `.github/` — CI there only
-  lints, typechecks, tests and builds.
+  Vercel's Git integration, so there is no deploy workflow in `.github/`.
+- **Do not add automatic GitHub Actions runs** (owner directive 2026-08-09: Actions storage is
+  full). `.github/workflows/ci.yml` is `workflow_dispatch` only and must stay that way; run the
+  gates locally (`npx prettier --check . && npx eslint . && npx tsc --noEmit && npx vitest run &&
+  npm run check:vercel && npx vite build`) before every commit instead.
