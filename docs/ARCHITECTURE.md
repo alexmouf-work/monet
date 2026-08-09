@@ -81,7 +81,8 @@ state back through `src/app/debugBridge.ts` (`window.__monet`: doc, stack, store
 
 Scenarios: `smoke` · `full` · `layering` (the owner's scenario) · `text` · `selection` ·
 `canvas` · `noise` · `recolour` · `export` · `save` · `sources` (GitHub against a mocked API) ·
-`theme` (toolbar wiring, brush cursor, theme cycling + persistence).
+`theme` (toolbar wiring, brush cursor, theme cycling + persistence) · `perf` (frame and
+handler costs).
 
 `shot()` waits two `requestAnimationFrame`s before capturing. A full-page screenshot taken
 immediately after a CSS-only change (a theme toggle) can otherwise return the *previous*
@@ -133,6 +134,35 @@ directory, so unknown paths correctly 404 instead.
   `data-theme` attribute and `engine/themeColors.ts` the renderer's cached copies. `themeMode`
   lives in `app/`, not `ui/`, because `app/settingsStore.ts` calls it and `app` must not import
   `ui` (the dependency rule in docs/01 §2).
+
+## Performance rules (2026-08-09, after an owner lag report)
+
+Measure with `npm run harness -- tests/manual/scenarios/perf.mjs`. It reports renderer frame
+cost from `window.__monet.perf()` **and** synchronous handler cost from a tight loop of
+synthetic `pointermove`s — Playwright's own mouse is paced far slower than a real 500–1000 Hz
+mouse, so only the synthetic loop exposes per-event work. Frame timings measure CPU-side
+submission, not GPU rasterisation.
+
+- **`willReadFrequently` only on canvases we read back.** It requests a CPU-backed surface;
+  on the visible canvas it costs GPU acceleration for every frame. `ctx2d` (readback) vs
+  `ctx2dDraw` (draw-only, used for the on-screen canvas).
+- **Per-event work must scale with the event, not with the document.** The stroke overlay
+  uploads `pending` (touched since the last upload), not `dirty` (the whole stroke): the
+  cumulative version cost 0.074→0.103 ms/event and rose as the stroke grew; it is now
+  0.033→0.028 ms/event and flat.
+- **Nothing samples the document by recompositing it.** `activeRenderer()?.compositeSnapshot()`
+  lends this frame's composite, cached until the next content invalidation; eyedropper drag
+  went 1.808 → 0.033 ms/event (300 events: 542 ms → 10 ms). Keep the `compositePixels`
+  fallback — the renderer is absent in tests and before mount.
+- **React's `wheel`/`touchstart`/`touchmove` root listeners are passive**, so `preventDefault`
+  in an `onWheel` prop is ignored and the page scrolls while you zoom. Register wheel natively
+  with `{ passive: false }`.
+- **Pointer-rate notifications get coalesced to a frame** (`reportCursor` → one rAF), or a
+  fast mouse renders React hundreds of times a second for a coordinate readout.
+- **Always-mounted components use narrow selectors.** `useDocStore()` with no selector
+  re-renders on every store change — for the toolbar that meant 21 buttons per pan event.
+- Crisp mode reuses one scratch canvas (`drawObjects.scratch`); it runs one thresholded pass
+  per colour per object per frame, so allocation there is per-frame allocation.
 
 ## Invariants worth knowing before editing
 

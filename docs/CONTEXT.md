@@ -46,6 +46,8 @@ browser. See docs/ARCHITECTURE.md for the as-built map and ROADMAP.csv for per-m
   fast-forwards the target branch and falls back to a merge commit; Monet never force-pushes.
 - Jars are read-only: saving a vanilla texture routes to Save As, which suggests the repo's own
   assets root plus the jar path's `assets/...` tail.
+- Scroll-to-zoom now suppresses the browser's own scroll/zoom (it could not before — see
+  docs/ARCHITECTURE.md §Performance rules on React's passive wheel listener).
 
 ## Superseded / cut
 
