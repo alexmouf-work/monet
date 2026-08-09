@@ -1,0 +1,135 @@
+/**
+ * Live object rendering — shapes (docs/03 §2.3) and text (docs/03 §6.4), with crisp
+ * mode (docs/03 §5) applied per colour pass so each pass keeps its exact colour.
+ */
+import type { ObjectItem, ShapeObject, TextObject } from '../core/model/types';
+import { hexToRgb } from '../core/color/convert';
+import { shapeContour } from '../core/shapes/geometry';
+import { thresholdAlpha } from '../core/raster/crisp';
+import { ctx2d, makeCanvas } from './layerCache';
+import { docPath } from './paths';
+import { alignOffset, fontString, layoutText } from './textLayout';
+
+/** Sizes a scratch canvas to the document and clears it. */
+function scratch(w: number, h: number): CanvasRenderingContext2D {
+  const ctx = ctx2d(makeCanvas(w, h));
+  ctx.clearRect(0, 0, w, h);
+  return ctx;
+}
+
+/** Draw one colour pass, thresholded, then blit at the pass's alpha. */
+function crispPass(
+  target: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  colorHex: string,
+  alpha: number,
+  paint: (ctx: CanvasRenderingContext2D) => void,
+): void {
+  if (alpha <= 0) return;
+  const s = scratch(w, h);
+  paint(s);
+  const data = s.getImageData(0, 0, w, h);
+  thresholdAlpha(data.data, hexToRgb(colorHex));
+  s.putImageData(data, 0, 0);
+  const prev = target.globalAlpha;
+  target.globalAlpha = alpha;
+  target.drawImage(s.canvas, 0, 0);
+  target.globalAlpha = prev;
+}
+
+export function shapePath(obj: ShapeObject): Path2D {
+  return docPath(shapeContour(obj.shape, obj.points), obj.transform);
+}
+
+/** Draws a shape in doc space (caller has the identity doc transform set). */
+export function drawShape(
+  ctx: CanvasRenderingContext2D,
+  obj: ShapeObject,
+  docW: number,
+  docH: number,
+): void {
+  const path = shapePath(obj);
+  const fillable = obj.shape !== 'line';
+
+  const paintFill = (c: CanvasRenderingContext2D) => {
+    c.fillStyle = obj.fill.color;
+    c.fill(path);
+  };
+  const paintStroke = (c: CanvasRenderingContext2D) => {
+    c.strokeStyle = obj.stroke.color;
+    c.lineWidth = Math.max(0.01, obj.stroke.width);
+    c.lineJoin = 'miter';
+    c.lineCap = 'butt';
+    c.stroke(path);
+  };
+
+  if (obj.crisp) {
+    if (obj.fill.enabled && fillable)
+      crispPass(ctx, docW, docH, obj.fill.color, obj.fill.alpha, paintFill);
+    if (obj.stroke.enabled)
+      crispPass(ctx, docW, docH, obj.stroke.color, obj.stroke.alpha, paintStroke);
+    return;
+  }
+
+  ctx.save();
+  if (obj.fill.enabled && fillable) {
+    ctx.globalAlpha = obj.fill.alpha;
+    paintFill(ctx);
+  }
+  if (obj.stroke.enabled) {
+    ctx.globalAlpha = obj.stroke.alpha;
+    paintStroke(ctx);
+  }
+  ctx.restore();
+}
+
+/** Applies a text object's box matrix, then paints its lines in local (unrotated) space. */
+function paintTextLines(ctx: CanvasRenderingContext2D, obj: TextObject, colorOverride?: string) {
+  const l = layoutText(obj);
+  const t = obj.transform;
+  ctx.save();
+  ctx.translate(t.cx, t.cy);
+  ctx.rotate((t.rotation * Math.PI) / 180);
+  ctx.scale(t.flipX ? -1 : 1, t.flipY ? -1 : 1);
+  ctx.translate(-t.w / 2, -t.h / 2);
+  ctx.font = fontString(obj);
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = colorOverride ?? obj.color;
+  l.lines.forEach((line, i) => {
+    const x = alignOffset(obj.align, t.w, l.widths[i]);
+    const y = i * l.lineHeight + l.ascent;
+    ctx.fillText(line, x, y);
+    if (obj.underline && line.length) {
+      const uy = y + Math.max(2, Math.round(obj.sizePx / 8));
+      ctx.fillRect(x, uy, l.widths[i], Math.max(1, Math.round(obj.sizePx / 12)));
+    }
+  });
+  ctx.restore();
+}
+
+export function drawText(
+  ctx: CanvasRenderingContext2D,
+  obj: TextObject,
+  docW: number,
+  docH: number,
+): void {
+  if (obj.crisp) {
+    crispPass(ctx, docW, docH, obj.color, obj.alpha, (c) => paintTextLines(c, obj));
+    return;
+  }
+  ctx.save();
+  ctx.globalAlpha = obj.alpha;
+  paintTextLines(ctx, obj);
+  ctx.restore();
+}
+
+export function drawObject(
+  ctx: CanvasRenderingContext2D,
+  obj: ObjectItem,
+  docW: number,
+  docH: number,
+): void {
+  if (obj.kind === 'shape') drawShape(ctx, obj, docW, docH);
+  else drawText(ctx, obj, docW, docH);
+}
