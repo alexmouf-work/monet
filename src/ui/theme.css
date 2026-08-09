@@ -884,3 +884,40 @@ kbd {
   line-height: 1;
   font-size: 12px;
 }
+
+/* ---------- shapes panel ---------- */
+
+.shapegrid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+}
+
+.shapegrid__btn {
+  aspect-ratio: 1;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 16px;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+.shapegrid__btn.is-active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.colorfield__hex {
+  width: 82px;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+}

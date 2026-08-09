@@ -4,6 +4,7 @@ import { useDocStore } from '../app/docStore';
 import { useViewStore } from '../app/viewStore';
 import { useToolStore, type FeatureTab, type ToolId } from '../app/toolStore';
 import { getTool } from '../tools';
+import { nudgeSelected } from '../tools/selectTool';
 import { isTypingTarget } from './Workspace';
 
 export interface ShortcutActions {
@@ -133,6 +134,18 @@ export function useShortcuts(actions: ShortcutActions) {
             if (doc) vs.hundred(doc.id, doc.width, doc.height);
             return;
         }
+        return;
+      }
+
+      const step = e.shiftKey ? 10 : 1;
+      const nudges: Record<string, [number, number]> = {
+        ArrowLeft: [-step, 0],
+        ArrowRight: [step, 0],
+        ArrowUp: [0, -step],
+        ArrowDown: [0, step],
+      };
+      if (nudges[e.code]) {
+        if (nudgeSelected(...nudges[e.code])) e.preventDefault();
         return;
       }
 

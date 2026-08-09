@@ -86,7 +86,8 @@ State per document: `{ zoom, panX, panY }`; doc→screen:
   1-device-px lines at every pixel boundary, `rgba(128,128,128,0.35)`, drawn in
   screen space after snapping doc gridlines to device pixels. At zoom ≥ 32 add a
   heavier line every 16 px (Minecraft sub-tile guide), `rgba(64,160,255,0.35)`.
-- **Checkerboard**: §1.1; 8-px screen-space squares independent of zoom.
+- **Checkerboard**: §1.1; 8-px screen-space squares independent of zoom, `#ffffff`/`#d4d4d4`
+  (light enough that the grid reads over it — see docs/01 §4 step 3).
 
 ## 3. Tiling preview (essential for seamless Minecraft textures)
 

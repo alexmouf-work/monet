@@ -20,8 +20,10 @@ export interface Scene {
 }
 
 const SURROUND = '#3d3d40';
-const CHECK_LIGHT = '#cfcfcf';
-const CHECK_DARK = '#a8a8a8';
+// Light checkerboard (was #cfcfcf/#a8a8a8): a mid-grey pixel grid is invisible against a
+// mid-grey checker, and seeing pixel boundaries over transparency is the point of the grid.
+const CHECK_LIGHT = '#ffffff';
+const CHECK_DARK = '#d4d4d4';
 const GRID = 'rgba(128,128,128,0.35)';
 const GRID_16 = 'rgba(64,160,255,0.35)';
 

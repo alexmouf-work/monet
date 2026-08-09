@@ -6,6 +6,7 @@ import { onToast, toast, type Toast } from './app/bus';
 import { autosaveNow, startAutosave } from './app/autosave';
 import { openFile, openLocalFiles, saveDoc, saveDocAs, saveProjectAs } from './app/fileActions';
 import { listAutosaves } from './integrations/idb';
+import { selectAll } from './tools/marquee';
 import './tools';
 import { TopBar } from './ui/TopBar';
 import { AppMenu, type MenuActions } from './ui/AppMenu';
@@ -18,6 +19,7 @@ import { RecoverDialog } from './ui/dialogs/RecoverDialog';
 import { UnsavedDialog } from './ui/dialogs/ConfirmDialog';
 import { ShortcutsDialog } from './ui/dialogs/ShortcutsDialog';
 import { useShortcuts, type ShortcutActions } from './ui/useShortcuts';
+import { deleteSelection, duplicateSelected } from './app/editActions';
 
 type DialogId = 'new' | 'recover' | 'shortcuts' | null;
 
@@ -127,11 +129,11 @@ export function App() {
       copy: notYet('Clipboard'),
       cut: notYet('Clipboard'),
       paste: notYet('Clipboard'),
-      del: notYet('Delete'),
-      selectAll: notYet('Selection'),
+      del: () => deleteSelection(),
+      selectAll: () => selectAll(),
       crop: notYet('Crop'),
       flatten: notYet('Flatten'),
-      duplicate: notYet('Duplicate'),
+      duplicate: () => duplicateSelected(),
       resizeCanvas: notYet('Canvas resize'),
       shortcutsHelp: () => setDialog('shortcuts'),
       about: () => toast('Monet — Paint 3D-style editor for Minecraft textures.'),

@@ -188,8 +188,11 @@ the canvas backing store to `cssSize × devicePixelRatio`:
 1. Clear; paint the **workspace surround** (neutral `#3d3d40`).
 2. Compute the doc→screen transform; `ctx.imageSmoothingEnabled = false` (always —
    nearest-neighbour at every zoom).
-3. **Checkerboard** for transparency, screen-space 8-px squares (`#cfcfcf`/`#a8a8a8`),
-   clipped to the document rect (skip when background mode is `color`).
+3. **Checkerboard** for transparency, screen-space 8-px squares (`#ffffff`/`#d4d4d4`),
+   clipped to the document rect (skip when background mode is `color`). The squares are
+   deliberately light: the pixel grid (§7, `rgba(128,128,128,0.35)`) is invisible against a
+   mid-grey checker, and reading pixel boundaries over transparency is exactly what the grid
+   is for. (Corrected 2026-08-09 after seeing it on screen; matches Photoshop's default.)
 4. Background colour rect when `background.mode === 'color'`.
 5. **Stack, bottom→top**:
    - `RasterLayer` → `drawImage(layerCache.get(id))`. `layerCache` keeps one
