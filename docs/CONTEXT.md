@@ -28,6 +28,9 @@ collaboration, any server component.
 | 2026-08-09 | **An outline is always drawn.** Unchecking *Outline* recolours it to the fill's colour/opacity at the same weight; it never removes geometry. |
 | 2026-08-09 | **Copy/paste covers objects**, not only pixel selections: a copied shape or text pastes back as a live, editable object. |
 | 2026-08-09 | **Dark mode** is in scope (the spec had called theming out-of-scope polish): `system` / `light` / `dark`, default `system`, persisted, toggled from the toolbar. |
+| 2026-08-10 | Monet is a **GitHub App** with **"Sign in with GitHub"**; the fine-grained PAT stays as a fallback. Repository access = the App's installation, chosen by the user. Setup: docs/GITHUB-APP.md. |
+| 2026-08-10 | Serverless functions are **allowed** (owner) — superseding "static output, no serverless functions". Exactly one exists, `api/github/token.ts`, because GitHub's token endpoint needs the client secret and sends no CORS headers. It is stateless and stores nothing. |
+| 2026-08-10 | The owner also has a **Hetzner server** available for anything needing persistence. Not used by sign-in, which is stateless — noted so a future feature that genuinely needs storage knows the option exists. |
 | spec | Design decisions D1–D8 and vetoable assumptions A1–A8: `docs/00-overview.md` §1, §5. PDF fit interpretation (contain; long-edges coincide for aspect ≥ √2): `docs/07` §6. |
 
 ## Shipped
@@ -62,4 +65,5 @@ browser. See docs/ARCHITECTURE.md for the as-built map and ROADMAP.csv for per-m
 | 2026-08-09 | PDF fit is **contain**, not a literal longest-edge match, so images squarer than the page are not cropped; identical to the literal rule for anything at least as elongated as A4. (docs/07 §6) |
 | 2026-08-09 | Deploy target: GitHub Pages workflow → **Vercel** (owner request). `.github/workflows/deploy.yml` deleted; `vercel.json` added. CI in `.github/` still lints/tests/builds. |
 | 2026-08-09 | "Light theme, hard-code the palette; theme work is polish, not v1 scope" (docs/09 preamble) → **superseded**: owner asked for a dark mode, so the palette is tokenised and there are three theme states. (docs/09 §9 rewritten) |
+| 2026-08-10 | "Static output, no serverless functions — nothing in Monet needs a server" (D1) → **one Edge Function**, for the GitHub App token exchange only. Forced by GitHub: the exchange needs the client secret and the endpoint has no CORS, so there is no browser-only route. |
 | 2026-08-09 | Brushes' `cursor: none` → **`crosshair`** (owner request). The overlay outline is 1–2 px wide at low zoom, so hiding the pointer left nothing to track. (docs/02 §3.4, docs/09 §8) |

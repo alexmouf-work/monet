@@ -1,8 +1,15 @@
 /** Connect repository — docs/08 §5, docs/09 §6. */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Dialog } from './Dialog';
 import { describeGhError, parseRepoRef } from '../../integrations/github/api';
 import { DEFAULT_WORK_BRANCH, connectRepo } from '../../integrations/github/repoSource';
+import {
+  accessibleRepos,
+  githubAppConfig,
+  type GhInstallationRepo,
+} from '../../integrations/github/auth';
+import { installUrl } from '../../integrations/github/oauth';
+import { GithubAccount, useAuthState } from '../GithubAccount';
 import { readToken } from '../../app/settingsStore';
 import { toast } from '../../app/bus';
 
@@ -18,8 +25,27 @@ export function ConnectRepoDialog({
   const [baseBranch, setBaseBranch] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const hasToken = !!readToken();
+  const { signedIn } = useAuthState();
+  const hasCredentials = signedIn || !!readToken();
   const parsed = parseRepoRef(ref);
+
+  // Signed in: offer the repositories the installation actually covers, so a typo or a repo the
+  // App cannot see is not the first thing the user discovers.
+  const [repos, setRepos] = useState<GhInstallationRepo[] | null>(null);
+  const [reposError, setReposError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!signedIn) return;
+    let live = true;
+    setRepos(null);
+    setReposError(null);
+    accessibleRepos().then(
+      (list) => live && setRepos(list),
+      (err: Error) => live && setReposError(err.message),
+    );
+    return () => {
+      live = false;
+    };
+  }, [signedIn]);
 
   const connect = async () => {
     if (!parsed) {
@@ -49,17 +75,67 @@ export function ConnectRepoDialog({
       title="Connect GitHub repository"
       onCancel={onClose}
       confirmLabel={busy ? 'Connecting…' : 'Connect'}
-      confirmDisabled={busy || !hasToken}
+      confirmDisabled={busy || !hasCredentials}
       onConfirm={() => void connect()}
     >
-      {!hasToken && (
+      {!hasCredentials && (
         <div className="notice">
-          No GitHub token yet.{' '}
-          <button className="linkbtn" onClick={onNeedToken}>
-            Add one in Settings
-          </button>{' '}
-          — a fine-grained token with <strong>Contents: Read and write</strong> on the repositories
-          you want to edit.
+          <p style={{ marginTop: 0 }}>Monet needs access to GitHub first.</p>
+          <GithubAccount compact />
+          <p style={{ marginBottom: 0 }}>
+            <button className="linkbtn" onClick={onNeedToken}>
+              Or use a personal access token
+            </button>{' '}
+            with <strong>Contents: Read and write</strong> on the repositories you want to edit.
+          </p>
+        </div>
+      )}
+
+      {signedIn && (
+        <div className="field-col">
+          <span className="field-label">
+            Repositories Monet can access
+            {repos ? ` (${repos.length})` : ''}
+          </span>
+          {repos === null && !reposError && <p className="panel__hint">Loading…</p>}
+          {reposError && <p className="panel__hint">Could not list repositories: {reposError}</p>}
+          {repos?.length === 0 && (
+            <p className="panel__hint">
+              The Monet app is not installed on any repository yet.{' '}
+              <a href={installUrl(githubAppConfig().appSlug)} target="_blank" rel="noreferrer">
+                Grant it access
+              </a>
+              , then reopen this dialog.
+            </p>
+          )}
+          {!!repos?.length && (
+            <div className="repolist">
+              {repos.map((r) => (
+                <button
+                  key={r.full_name}
+                  className={`repolist__item ${ref === r.full_name ? 'is-active' : ''}`}
+                  onClick={() => setRef(r.full_name)}
+                  title={
+                    r.permissions?.push === false
+                      ? 'Read-only for this account — saves would fail'
+                      : r.full_name
+                  }
+                >
+                  <span className="repolist__name">{r.full_name}</span>
+                  <span className="repolist__meta">
+                    {r.permissions?.push === false ? 'read-only' : r.default_branch}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+          <p className="panel__hint">
+            Missing one?{' '}
+            <a href={installUrl(githubAppConfig().appSlug)} target="_blank" rel="noreferrer">
+              Change which repositories Monet can access
+            </a>
+            .
+          </p>
         </div>
       )}
 

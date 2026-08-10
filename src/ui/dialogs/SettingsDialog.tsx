@@ -1,6 +1,7 @@
-/** Settings — docs/09 §6: GitHub token, cached jars, autosave, about. */
+/** Settings — docs/09 §6: GitHub account/token, cached jars, autosave, about. */
 import { useEffect, useState } from 'react';
 import { Dialog } from './Dialog';
+import { GithubAccount, useAuthState } from '../GithubAccount';
 import { readToken, useSettingsStore, writeToken } from '../../app/settingsStore';
 import {
   cachedJarBytes,
@@ -17,6 +18,7 @@ export function SettingsDialog({ onClose }: { onClose(): void }) {
   const [jars, setJars] = useState<JarMeta[]>([]);
   const [cached, setCached] = useState(0);
   const autosaveSeconds = useSettingsStore((s) => s.autosaveSeconds);
+  const { signedIn } = useAuthState();
 
   useEffect(() => {
     void loadJarMetas().then(setJars);
@@ -32,7 +34,14 @@ export function SettingsDialog({ onClose }: { onClose(): void }) {
   return (
     <Dialog title="Settings" onCancel={onClose} confirmLabel="Save" onConfirm={save} wide>
       <section className="field-col">
-        <span className="field-label">GitHub token</span>
+        <span className="field-label">GitHub</span>
+        <GithubAccount />
+      </section>
+
+      <details className="field-col" open={!signedIn && !!token}>
+        <summary className="field-label" style={{ cursor: 'pointer' }}>
+          {signedIn ? 'Personal access token (not needed while signed in)' : 'Use a token instead'}
+        </summary>
         <div className="field-row">
           <input
             type={reveal ? 'text' : 'password'}
@@ -58,13 +67,15 @@ export function SettingsDialog({ onClose }: { onClose(): void }) {
           </button>
         </div>
         <p className="panel__hint">
-          Create a <strong>fine-grained personal access token</strong>: Repository access → the
-          repositories you will connect; Permissions → <strong>Contents: Read and write</strong>
-          (Metadata is added automatically). Classic tokens with the <code>repo</code> scope also
-          work. The token is stored in this browser only and is sent to <code>api.github.com</code>{' '}
-          and nowhere else.
+          An alternative to signing in, and the only route when self-hosting Monet without the
+          GitHub App. Create a <strong>fine-grained personal access token</strong>: Repository
+          access → the repositories you will connect; Permissions →{' '}
+          <strong>Contents: Read and write</strong> (Metadata is added automatically). Classic
+          tokens with the <code>repo</code> scope also work. The token is stored in this browser
+          only and is sent to <code>api.github.com</code> and nowhere else. While signed in, the
+          signed-in account is used and this token is ignored.
         </p>
-      </section>
+      </details>
 
       <section className="field-col">
         <span className="field-label">Cached jars ({(cached / 1_048_576).toFixed(1)} MB)</span>

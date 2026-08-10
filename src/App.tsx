@@ -6,6 +6,7 @@ import { onToast, toast, type Toast } from './app/bus';
 import { autosaveNow, startAutosave } from './app/autosave';
 import { openFile, openLocalFiles, saveDoc, saveDocAs, saveProjectAs } from './app/fileActions';
 import { listAutosaves } from './integrations/idb';
+import { completeSignIn } from './integrations/github/auth';
 import { selectAll } from './tools/marquee';
 import { isTypingTarget } from './ui/Workspace';
 import './tools';
@@ -63,6 +64,9 @@ export function App() {
 
   useEffect(() => {
     void useSettingsStore.getState().load();
+    // If this load is the GitHub OAuth callback, finish the sign-in and clean up the URL
+    // (docs/08 §4.1). A no-op on every other load.
+    void completeSignIn();
     // Reconnect stored sources; none of these touch the network until browsed.
     void restoreJarSources();
     void restoreFolderSources();

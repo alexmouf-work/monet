@@ -1,8 +1,10 @@
 /**
- * GitHub REST wrapper — docs/08 §4. api.github.com sends CORS headers, so the browser can do
- * all of this with a user PAT: no server, no git binary. The token is only ever sent here.
+ * GitHub REST wrapper — docs/08 §4. api.github.com sends CORS headers, so the browser can do all
+ * of this itself: no git binary, and no server beyond the token exchange in `api/github/token.ts`.
+ * Credentials come from `auth.authToken()` — the signed-in App session if there is one, else the
+ * user's PAT — and are only ever sent to api.github.com.
  */
-import { readToken } from '../../app/settingsStore';
+import { authToken, invalidateSession, isSignedIn } from './auth';
 
 const API = 'https://api.github.com';
 
@@ -25,12 +27,16 @@ export function describeGhError(err: unknown): string {
       : '';
   switch (err.status) {
     case 401:
-      return 'GitHub token is invalid or expired — update it in Settings.';
+      return isSignedIn()
+        ? 'GitHub rejected the sign-in — sign in again in Settings.'
+        : 'GitHub credentials are invalid or expired — sign in or update your token in Settings.';
     case 403:
     case 429:
       return 'GitHub rate limit reached — try again in a minute.';
     case 404:
-      return 'Not found: the repository may not exist, or the token lacks access to it.';
+      return isSignedIn()
+        ? 'Not found: grant the Monet app access to this repository, or check the name.'
+        : 'Not found: the repository may not exist, or the token lacks access to it.';
     case 409:
       return apiMessage || 'Conflict — the branches have diverged.';
     case 422:
@@ -41,8 +47,8 @@ export function describeGhError(err: unknown): string {
 }
 
 export async function gh<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const token = readToken();
-  if (!token) throw new GhError(401, {}, 'No GitHub token set.');
+  const token = await authToken();
+  if (!token) throw new GhError(401, {}, 'Not signed in to GitHub.');
   const res = await fetch(`${API}${path}`, {
     method,
     headers: {
@@ -54,6 +60,9 @@ export async function gh<T>(method: string, path: string, body?: unknown): Promi
     body: body ? JSON.stringify(body) : undefined,
   });
   if (!res.ok) {
+    // A rejected token must not leave the UI claiming we are signed in. 404 is excluded on
+    // purpose: for a GitHub App it usually means "that repo is not in the installation".
+    if (res.status === 401) invalidateSession();
     const parsed = await res.json().catch(() => ({}));
     throw new GhError(res.status, parsed, `GitHub ${method} ${path} → ${res.status}`);
   }

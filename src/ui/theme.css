@@ -860,6 +860,73 @@ kbd {
   border-radius: 4px;
 }
 
+/* GitHub account block (Settings + Connect repository). */
+.account {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.account__avatar {
+  border-radius: 50%;
+  border: 1px solid var(--border);
+}
+
+.account__name {
+  font-weight: 600;
+  margin-right: auto;
+}
+
+/* Repositories the GitHub App installation covers — a picker beats typing a name blind. */
+.repolist {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 180px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 3px;
+  background: var(--panel-2);
+}
+
+.repolist__item {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  text-align: left;
+  padding: 5px 7px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+}
+
+.repolist__item:hover {
+  background: var(--accent-soft);
+}
+
+.repolist__item.is-active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.repolist__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.repolist__meta {
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
 /* The eyedropper's home (owner directive): reachable from every tab, next to the colour. */
 .colorpanel__pick {
   align-self: stretch;

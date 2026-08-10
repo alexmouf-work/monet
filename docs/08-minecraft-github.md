@@ -56,11 +56,60 @@ document; already-open paths focus the existing tab.
 
 ## 4. GitHub: auth & API wrapper — `integrations/github/api.ts`
 
-**Token**: Settings dialog field, stored at `localStorage['monet.github.token']`,
-with a "Forget token" button and this exact guidance text: *fine-grained personal
-access token → Repository access: the repos you'll connect → Permissions →
-Contents: Read and write (Metadata is added automatically). Classic tokens with
-`repo` scope also work.* The token is only ever sent to `https://api.github.com`.
+Two ways in. `auth.authToken()` picks, in order: a **signed-in GitHub App session**, else the
+**personal access token**. Everything downstream (`gh()`, sources, save, sync) is unaware of
+which one it got.
+
+### 4.1 Sign in with GitHub — GitHub App, user-to-server (owner request 2026-08-10)
+
+Monet is a **GitHub App** and acts only ever *as the signed-in user* on the repositories that
+user has installed it on. It never authenticates as the App itself, so the App has no private
+key and no webhook. Owner setup: **`docs/GITHUB-APP.md`**.
+
+**One server-side file, and only because GitHub forces it.** The `code`→token exchange needs the
+client secret (cannot ship in a bundle) and `github.com/login/oauth/access_token` sends no CORS
+headers (so the browser cannot call it even as a public client — GitHub supports no PKCE and no
+browser-only flow). `api/github/token.ts` is therefore a stateless Vercel Edge Function that
+holds the secret, exchanges or refreshes, and stores nothing. It supersedes docs/00 D1's "no
+serverless functions"; nothing else moved server-side.
+
+Flow — `integrations/github/oauth.ts` (pure) + `auth.ts` (stateful):
+
+1. **Begin**: random 24-byte hex `state` → `sessionStorage`, then navigate to
+   `github.com/login/oauth/authorize?client_id&redirect_uri&state`. **No `scope`** — a GitHub
+   App's permissions come from the App.
+2. **Return**: GitHub redirects to `redirect_uri?code&state`. On boot, `completeSignIn()` reads
+   the query, compares `state` against the stored one (**mismatch or missing ⇒ refuse without
+   exchanging the code**), consumes it, and strips the query with `replaceState`.
+3. **Exchange**: `POST {tokenEndpoint} {code}` → `{access_token, expires_in: 28800,
+   refresh_token, refresh_token_expires_in}` → absolute deadlines in
+   `localStorage['monet.github.session']`.
+4. **Identity**: `GET /user` → cache `login` + `avatar_url` on the session so the UI can name the
+   account without a round trip.
+5. **Refresh**: `authToken()` refreshes ~5 min before expiry (`REFRESH_SKEW_MS`), single-flight,
+   so a save can never straddle an expiry. A dead refresh token clears the session and says so.
+6. **Sign out** clears the session. A `401` from any API call clears it too (`invalidateSession`),
+   so the UI cannot keep claiming to be signed in. `404` deliberately does **not**: for an App it
+   usually means "that repo is not in the installation", which is a different fix.
+
+**Repository access is the installation.** `GET /user/installations` →
+`/user/installations/{id}/repositories` gives exactly what Monet may touch; the Connect dialog
+lists it (deduplicated, sorted, `push: false` marked read-only) instead of asking the user to
+type a name and find out later. "Repository access" links to
+`github.com/apps/<slug>/installations/new`.
+
+**Config** — `githubAppConfig()`: `VITE_GITHUB_CLIENT_ID`, `VITE_GITHUB_APP_SLUG`,
+`VITE_GITHUB_TOKEN_ENDPOINT` (default `/api/github/token`), each overridable at runtime via
+`window.__MONET_GITHUB__` for self-hosting and for the harness. **No client id ⇒ sign-in is
+hidden entirely** and the PAT is the only route, which is what a plain static self-host gets.
+
+### 4.2 Personal access token (fallback, unchanged)
+
+Settings → *Use a token instead*, stored at `localStorage['monet.github.token']`, with a "Forget
+token" button and this exact guidance text: *fine-grained personal access token → Repository
+access: the repos you'll connect → Permissions → Contents: Read and write (Metadata is added
+automatically). Classic tokens with `repo` scope also work.* Ignored while signed in. Tokens of
+either kind are only ever sent to `https://api.github.com`.
 
 Every call goes through one helper:
 

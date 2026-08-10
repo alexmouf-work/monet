@@ -37,6 +37,8 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,woff2,png,svg}'],
         maximumFileSizeToCacheInBytes: 6_000_000,
         navigateFallback: 'index.html',
+        // The token exchange is a real server route; the shell must never stand in for it.
+        navigateFallbackDenylist: [/^\/api\//],
       },
     }),
   ],

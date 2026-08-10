@@ -48,6 +48,7 @@ up with no build step.
 | `theme.mjs` | toolbar buttons actually fire, brush cursor is visible, theme cycles and persists |
 | `perf.mjs` | frame cost **and** handler cost; also asserts wheel-zoom can cancel page scroll |
 | `eyedropper-shapes-clipboard.mjs` | momentary picking, outline-off edges, object copy/paste |
+| `github-login.mjs` | GitHub App sign-in: authorize URL, exchange, refresh, installations, forged-state refusal — all against a mocked GitHub |
 
 `shot()` deliberately waits two `requestAnimationFrame`s before capturing: a full-page
 screenshot taken straight after a CSS-only change can return the previous compositor frame, so a

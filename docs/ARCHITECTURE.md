@@ -4,10 +4,10 @@ Rule (CLAUDE.md): this file maps what **exists on `main`**, overview first, deta
 Update it in the same commit as any architecture-affecting change. The *target* design is the
 numbered spec (`docs/00`–`docs/10`) — do not duplicate it here; describe reality and point.
 
-## State: v1 complete (2026-08-09, M0–M12)
+## State: v1 complete (2026-08-09, M0–M12), plus owner requests since
 
-Every feature in `docs/00 §3` is implemented and exercised in a real browser. 101 unit tests
-over `src/core`; behaviour verified by harness scenarios (below).
+Every feature in `docs/00 §3` is implemented and exercised in a real browser. 117 unit tests
+(`src/core` plus the pure GitHub OAuth helpers); behaviour verified by harness scenarios (below).
 
 ## Tree
 
@@ -20,8 +20,12 @@ vitest.config.ts                       unit tests, node env, plugin-free (note b
 eslint.config.js .prettierrc.json      lint/format
 playwright.config.ts                   e2e (build + preview on :4173)
 public/icon-{192,512}.png              app icons (generated)
-.github/workflows/ci.yml               format → lint → typecheck → test → build
+.github/workflows/ci.yml               manual only (workflow_dispatch) — note below
 vercel.json                            Vercel preset, output dist/, PWA cache headers
+.env.example                           optional GitHub App config (docs/GITHUB-APP.md)
+
+api/github/token.ts                    THE only server-side code: GitHub App token exchange
+                                       (Edge, stateless, holds the client secret)
 
 src/core/                              PURE: no DOM, no React, all unit-tested
   model/{types,document,commands}.ts   canonical shapes, auto-layering, undo commands
@@ -57,12 +61,14 @@ src/app/                               stores + action layer
 src/integrations/
   sources.ts sourceSave.ts             provider façade + `.monet` mirror path
   github/{api,repoSource}.ts           REST wrapper; connect/browse/commit+push/sync
+  github/{oauth,auth}.ts               sign-in: pure flow helpers + session/refresh/installations
   jar/jarSource.ts                     jszip + IndexedDB cache, mcmeta badges
   fsa/{localFile,folderSource}.ts      pickers with download fallback; folder source
   idb.ts                               idb-keyval wrappers + autosave store
 
 src/ui/                                React; no business logic
   App.tsx TopBar Toolbar AppMenu DocTabs Workspace StatusBar OptionsPanel ColorPanel
+  GithubAccount.tsx                    sign-in / signed-in block, shared by two dialogs
   SourcesSidebar TextEditOverlay UpdatePrompt sceneHooks useShortcuts fonts theme.css
   panels/{Brushes,Shapes,Text,Canvas,Noise,Recolour}Panel.tsx
   controls/{Slider,ColorField}.tsx
@@ -82,7 +88,8 @@ state back through `src/app/debugBridge.ts` (`window.__monet`: doc, stack, store
 Scenarios: `smoke` · `full` · `layering` (the owner's scenario) · `text` · `selection` ·
 `canvas` · `noise` · `recolour` · `export` · `save` · `sources` (GitHub against a mocked API) ·
 `theme` (toolbar wiring, brush cursor, theme cycling + persistence) · `perf` (frame and
-handler costs) · `eyedropper-shapes-clipboard` (the three 2026-08-09 owner requests).
+handler costs) · `eyedropper-shapes-clipboard` (the three 2026-08-09 owner requests) ·
+`github-login` (the App sign-in flow against a mocked GitHub).
 
 `shot()` waits two `requestAnimationFrame`s before capturing. A full-page screenshot taken
 immediately after a CSS-only change (a theme toggle) can otherwise return the *previous*
@@ -111,6 +118,27 @@ which is how it was first found (2026-08-09).
 asset URLs relative (so a build also works from a subpath or `file://`). Rewriting an unknown
 nested path to `index.html` would make those relative URLs resolve against the wrong
 directory, so unknown paths correctly 404 instead.
+
+## GitHub App sign-in (2026-08-10, owner request)
+
+Monet is a GitHub App; users sign in and Monet acts **as them** on the repositories they install
+it on. Spec: docs/08 §4.1. Owner setup: docs/GITHUB-APP.md.
+
+`api/github/token.ts` is the whole server side and exists only because GitHub leaves no choice:
+the `code`→token exchange needs the App's client secret (cannot be in a bundle) and
+`github.com/login/oauth/access_token` sends **no CORS headers**, so a browser cannot call it even
+as a public client — GitHub supports neither PKCE nor any browser-only flow. The function is
+stateless, keeps nothing, allowlists origins, and returns only token fields.
+
+- `oauth.ts` is pure (authorize URL, state, expiry arithmetic, stored-session validation) and
+  unit-tested; `auth.ts` holds the session, refreshes single-flight ~5 min before expiry, and
+  reads installations. `api.ts` just asks `authToken()` and never learns which credential it got.
+- **Unconfigured is a supported state**: no `VITE_GITHUB_CLIENT_ID` ⇒ no sign-in button, PAT only.
+  That is what `npm run dev` and any static self-host see, so neither regressed.
+- A stale-write hazard worth remembering: anything that reads the session, awaits, then writes it
+  back can discard a token refreshed while it waited (`refreshIdentity` did exactly that until the
+  harness log showed the old token stored behind the new one). Merge via `patchSession`, which
+  re-reads at write time.
 
 ## Deviations from the spec's module list (docs/01 §2), with reasons
 

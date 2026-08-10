@@ -56,8 +56,14 @@ pick up exactly where you left off without asking further questions.
 - Stack: Vite + React + TypeScript (strict) + Zustand; Canvas 2D + typed-array pixel
   buffers; jszip, pdf-lib, idb-keyval; Vitest (unit, `src/core` is DOM-free) +
   Playwright (E2E, chromium). Full table + layout: `docs/01-architecture.md` §1–2.
-- No backend, no server, no git binary: GitHub via REST API + user PAT; jars parsed
-  in-browser; local files via File System Access (download fallback).
+- No git binary; jars parsed in-browser; local files via File System Access (download
+  fallback). GitHub via REST API, authenticated either by **signing into the Monet GitHub
+  App** or by a user PAT (docs/08 §4, setup in `docs/GITHUB-APP.md`).
+- **One** piece of server-side code exists: `api/github/token.ts`, a stateless Vercel Edge
+  Function for the OAuth token exchange (GitHub's endpoint needs the client secret and sends
+  no CORS headers). Serverless functions are permitted (owner, 2026-08-10) but keep them to
+  what genuinely cannot run in the browser. A Hetzner server is available if something ever
+  needs real persistence.
 - Status: spec complete; **no application code yet** — next is M0 (scaffold), then
   M1–M12 per `docs/10-milestones.md`. Commands once M0 lands:
   `npm install` / `npm run dev` / `npm test` / `npm run build`.
