@@ -101,22 +101,26 @@ export async function openLocalFiles(): Promise<void> {
   for (const file of files) await openFile(file);
 }
 
-export async function openFile(file: File | Blob, nameHint?: string): Promise<void> {
+/** Returns the new document's id, or null when the file could not be opened. */
+export async function openFile(file: File | Blob, nameHint?: string): Promise<string | null> {
   const name = nameHint ?? (file as File).name ?? 'Untitled';
   try {
     if (name.toLowerCase().endsWith('.monet')) {
       const doc = await readMonet(new Uint8Array(await file.arrayBuffer()), stripExt(name));
       useDocStore.getState().addDoc(doc);
-      return;
+      return doc.id;
     }
     const { pixels, width, height } = await decodeImage(file);
     if (width > MAX_DIM || height > MAX_DIM) {
       toast(`${name} is larger than ${MAX_DIM}px and cannot be opened.`, 'error');
-      return;
+      return null;
     }
-    useDocStore.getState().addDoc(createDoc({ name: stripExt(name), width, height, pixels }));
+    const doc = createDoc({ name: stripExt(name), width, height, pixels });
+    useDocStore.getState().addDoc(doc);
+    return doc.id;
   } catch (err) {
     const msg = err instanceof MonetFileError ? err.message : `Could not open ${name}.`;
     toast(msg, 'error');
+    return null;
   }
 }

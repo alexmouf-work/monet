@@ -31,6 +31,7 @@ collaboration, any server component.
 | 2026-08-10 | Monet is a **GitHub App** with **"Sign in with GitHub"**; the fine-grained PAT stays as a fallback. Repository access = the App's installation, chosen by the user. Setup: docs/GITHUB-APP.md. |
 | 2026-08-10 | Serverless functions are **allowed** (owner) — superseding "static output, no serverless functions". Exactly one exists, `api/github/token.ts`, because GitHub's token endpoint needs the client secret and sends no CORS headers. It is stateless and stores nothing. |
 | 2026-08-10 | The owner also has a **Hetzner server** available for anything needing persistence. Not used by sign-in, which is stateless — noted so a future feature that genuinely needs storage knows the option exists. |
+| 2026-08-10 | Image files **open in Monet from the OS file manager** (Explorer "Open with"), and `Ctrl+S` then overwrites that file in place. Requires the PWA to be installed, so an install banner exists whose pitch is exactly that. Chromium desktop only; other browsers keep drag-and-drop + Ctrl+O. |
 | spec | Design decisions D1–D8 and vetoable assumptions A1–A8: `docs/00-overview.md` §1, §5. PDF fit interpretation (contain; long-edges coincide for aspect ≥ √2): `docs/07` §6. |
 
 ## Shipped
@@ -53,6 +54,7 @@ browser. See docs/ARCHITECTURE.md for the as-built map and ROADMAP.csv for per-m
   fast-forwards the target branch and falls back to a merge commit; Monet never force-pushes.
 - Jars are read-only: saving a vanilla texture routes to Save As, which suggests the repo's own
   assets root plus the jar path's `assets/...` tail.
+- A texture opened from Explorer stays connected to that file: no "where should I put it?" on save.
 - Scroll-to-zoom now suppresses the browser's own scroll/zoom (it could not before — see
   docs/ARCHITECTURE.md §Performance rules on React's passive wheel listener).
 

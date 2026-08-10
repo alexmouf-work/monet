@@ -48,6 +48,7 @@ up with no build step.
 | `theme.mjs` | toolbar buttons actually fire, brush cursor is visible, theme cycles and persists |
 | `perf.mjs` | frame cost **and** handler cost; also asserts wheel-zoom can cancel page scroll |
 | `eyedropper-shapes-clipboard.mjs` | momentary picking, outline-off edges, object copy/paste |
+| `file-handler.mjs` | an OS "open with" launch: fake `launchQueue` + handles, then Ctrl+S writing back to the launched file |
 | `github-login.mjs` | GitHub App sign-in: authorize URL, exchange, refresh, installations, forged-state refusal — all against a mocked GitHub |
 
 `shot()` deliberately waits two `requestAnimationFrame`s before capturing: a full-page
@@ -58,5 +59,6 @@ correct app looks broken. If a screenshot disagrees with `state()`, trust `state
 
 `node tests/manual/prodboot.mjs` (after `npx vite build`) serves `dist/` the way a static host
 does — this is what Vercel serves — and asserts the shell renders, the manifest and service
-worker resolve, the SW registers at scope `/`, and a document can be drawn in. Use it after any
+worker resolve, the SW registers at scope `/`, the manifest's `file_handlers` are intact with a
+resolvable `action`, and a document can be drawn in. Use it after any
 change to `vite.config.ts`, `vercel.json` or the PWA setup.

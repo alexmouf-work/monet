@@ -20,6 +20,36 @@ export default defineConfig({
         display: 'standalone',
         orientation: 'landscape',
         start_url: './',
+        /**
+         * Open-with from the OS file manager — docs/07 §10. Chromium registers these with
+         * Windows (and macOS/Linux) when the PWA is **installed**, so "Open with → Monet"
+         * appears in Explorer. `action` must be a real served URL: Monet has no client-side
+         * routing and no catch-all rewrite, so it is the app root, and `launchQueue` (not the
+         * URL) carries the files. Extensions here mirror TYPE_IMAGES in fsa/localFile.ts —
+         * registering a type the editor cannot open would be worse than not registering it.
+         *
+         * No per-handler `icons`: declaring them would repaint every associated file in
+         * Explorer with Monet's icon, and a folder of textures is easier to read with its
+         * normal thumbnails. `launch_type` is left at its default, `single-client`, so a
+         * multi-file selection arrives as one launch carrying every file.
+         */
+        file_handlers: [
+          {
+            action: '/',
+            accept: {
+              'image/png': ['.png'],
+              'image/jpeg': ['.jpg', '.jpeg'],
+              'image/webp': ['.webp'],
+              'image/bmp': ['.bmp'],
+              'image/gif': ['.gif'],
+              'image/vnd.microsoft.icon': ['.ico'],
+            },
+          },
+          { action: '/', accept: { 'application/zip': ['.monet'] } },
+        ],
+        // Opening a second file reuses the window it would otherwise duplicate; the files
+        // arrive as extra document tabs instead of extra windows.
+        launch_handler: { client_mode: 'focus-existing' },
         icons: [
           { src: 'icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: 'icon-512.png', sizes: '512x512', type: 'image/png' },

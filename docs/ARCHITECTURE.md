@@ -56,6 +56,8 @@ src/app/                               stores + action layer
   fileActions exportActions editActions selectionActions canvasActions
   adjustSession.ts                     shared preview/bake for noise + recolour
   themeMode.ts                         system|light|dark, data-theme stamping
+  launchFiles.ts                       OS "open with" launches → docs bound to their handles
+  installPrompt.ts                     beforeinstallprompt capture (installing enables that)
   autosave.ts debugBridge.ts
 
 src/integrations/
@@ -69,6 +71,7 @@ src/integrations/
 src/ui/                                React; no business logic
   App.tsx TopBar Toolbar AppMenu DocTabs Workspace StatusBar OptionsPanel ColorPanel
   GithubAccount.tsx                    sign-in / signed-in block, shared by two dialogs
+  InstallBanner.tsx                    install offer; its pitch is the file association
   SourcesSidebar TextEditOverlay UpdatePrompt sceneHooks useShortcuts fonts theme.css
   panels/{Brushes,Shapes,Text,Canvas,Noise,Recolour}Panel.tsx
   controls/{Slider,ColorField}.tsx
@@ -89,7 +92,8 @@ Scenarios: `smoke` · `full` · `layering` (the owner's scenario) · `text` · `
 `canvas` · `noise` · `recolour` · `export` · `save` · `sources` (GitHub against a mocked API) ·
 `theme` (toolbar wiring, brush cursor, theme cycling + persistence) · `perf` (frame and
 handler costs) · `eyedropper-shapes-clipboard` (the three 2026-08-09 owner requests) ·
-`github-login` (the App sign-in flow against a mocked GitHub).
+`github-login` (the App sign-in flow against a mocked GitHub) · `file-handler` (an OS launch,
+with fake handles that record what gets written back).
 
 `shot()` waits two `requestAnimationFrame`s before capturing. A full-page screenshot taken
 immediately after a CSS-only change (a theme toggle) can otherwise return the *previous*
@@ -139,6 +143,23 @@ stateless, keeps nothing, allowlists origins, and returns only token fields.
   back can discard a token refreshed while it waited (`refreshIdentity` did exactly that until the
   harness log showed the old token stored behind the new one). Merge via `patchSession`, which
   re-reads at write time.
+
+## Opening files from the OS (2026-08-10, owner request)
+
+Spec: docs/07 §10. Manifest `file_handlers` + `window.launchQueue`; Windows Explorer's
+"Open with → Monet" works once the PWA is **installed**, which is why there is now an install
+banner at all. Because the launch delivers `FileSystemFileHandle`s, an opened file is bound to its
+handle and `Ctrl+S` overwrites it in place with no dialog.
+
+Three things that bite here:
+
+- `launchQueue.setConsumer` must be called **before any await** in boot (the queue holds a launch
+  only until a consumer exists) and **once** — StrictMode's double mount opened every file twice
+  until `startFileHandling` became idempotent.
+- The handler `action` has to be a served URL. With no catch-all rewrite, anything but `/` would
+  404 on launch; `prodboot.mjs` fetches each action to keep that honest.
+- `beforeinstallprompt` fires once and the event is single-use: capture it, `preventDefault`, keep
+  it, and drop it after `prompt()` — hence `installPrompt.ts` rather than inline component state.
 
 ## Deviations from the spec's module list (docs/01 §2), with reasons
 

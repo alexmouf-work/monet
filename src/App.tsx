@@ -7,6 +7,8 @@ import { autosaveNow, startAutosave } from './app/autosave';
 import { openFile, openLocalFiles, saveDoc, saveDocAs, saveProjectAs } from './app/fileActions';
 import { listAutosaves } from './integrations/idb';
 import { completeSignIn } from './integrations/github/auth';
+import { startFileHandling } from './app/launchFiles';
+import { watchInstallability } from './app/installPrompt';
 import { selectAll } from './tools/marquee';
 import { isTypingTarget } from './ui/Workspace';
 import './tools';
@@ -29,6 +31,7 @@ import { SettingsDialog } from './ui/dialogs/SettingsDialog';
 import { SourcesSidebar } from './ui/SourcesSidebar';
 import { SaveAsDialog } from './ui/dialogs/SaveAsDialog';
 import { UpdatePrompt } from './ui/UpdatePrompt';
+import { InstallBanner } from './ui/InstallBanner';
 import { watchSystemTheme } from './app/themeMode';
 import { addJarSource, restoreJarSources } from './integrations/jar/jarSource';
 import {
@@ -64,6 +67,10 @@ export function App() {
 
   useEffect(() => {
     void useSettingsStore.getState().load();
+    // Before anything that can await: a file the OS handed us waits in the launch queue only
+    // until a consumer exists, and only the first consumer counts (docs/07 §10).
+    startFileHandling();
+    const stopInstallWatch = watchInstallability();
     // If this load is the GitHub OAuth callback, finish the sign-in and clean up the URL
     // (docs/08 §4.1). A no-op on every other load.
     void completeSignIn();
@@ -75,7 +82,10 @@ export function App() {
     void listAutosaves().then((l) => {
       if (l.length) setDialog('recover');
     });
-    return stop;
+    return () => {
+      stop();
+      stopInstallWatch();
+    };
   }, []);
 
   useEffect(() => {
@@ -311,6 +321,7 @@ export function App() {
       )}
 
       <UpdatePrompt />
+      <InstallBanner />
 
       <div className="toasts">
         {toasts.map((t) => (

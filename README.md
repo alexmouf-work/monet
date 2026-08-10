@@ -69,8 +69,30 @@ fast-forwards `main` — or any branch — to match, falling back to a merge com
 the branches have diverged. It never force-pushes. Editing a vanilla texture and saving
 it into your mod repo suggests the right path automatically.
 
-Connect with a fine-grained personal access token (**Contents: Read and write**) in
-Settings; it is stored in your browser and sent only to `api.github.com`.
+**Sign in with GitHub** in Settings and pick which repositories Monet may touch — Monet is a
+GitHub App, so its access is exactly the repositories you install it on, and nothing else. A
+fine-grained personal access token (**Contents: Read and write**) still works instead, and is the
+route when self-hosting. Either way the credential is stored in your browser and sent only to
+`api.github.com`.
+
+## Installing, and opening files from Explorer
+
+Install Monet (the **Install** button in the app, or the install icon in Chrome/Edge's address
+bar) and it registers itself with the operating system as an image editor. After that, in Windows
+File Explorer:
+
+- **right-click a PNG → Open with → Monet** — or set Monet as the default for `.png` and
+  double-click;
+- the file opens in Monet's own window, and **`Ctrl+S` saves straight back to that file** — no
+  dialog, no "where do you want to put it";
+- select several files and they open as several tabs in one window.
+
+Registered types: `.png .jpg .jpeg .webp .bmp .gif .ico` and Monet's own `.monet` projects. This
+needs Chrome or Edge on the desktop (Windows, macOS or Linux) — the underlying File Handling API
+does not exist in Firefox or Safari, where drag-and-drop onto the window and `Ctrl+O` still work.
+
+Installing also gets you the offline app shell, so Monet keeps working on a plane with local
+files.
 
 ## Layered project files
 
@@ -80,8 +102,10 @@ editable, from any machine, without ever being packaged into a built jar.
 
 ## Deploying
 
-Hosted on Vercel as a static build — nothing in Monet needs a server, so there are no
-serverless functions.
+Hosted on Vercel as a static build. One serverless function exists, `api/github/token.ts`, purely
+to exchange the GitHub App's OAuth code for a token — that step needs the App's client secret and
+GitHub's endpoint sends no CORS headers, so it cannot happen in the browser. The editor itself
+needs no server. Setting the App up is [`docs/GITHUB-APP.md`](docs/GITHUB-APP.md).
 
 1. In Vercel, **Add New → Project** and import `alexmouf-work/monet`. The Vite preset is
    detected automatically; `vercel.json` pins it anyway, along with `dist` as the output
@@ -89,8 +113,8 @@ serverless functions.
 2. **Settings → Domains → Add** `monet.mouftools.com`, then point that DNS record at Vercel.
 
 After that, every push to `main` deploys to production and every other branch gets its own
-preview URL. GitHub Actions only runs the checks (format, lint, typecheck, tests, build) — it
-does not deploy.
+preview URL. GitHub Actions does not deploy, and no longer runs on push either — the workflow is
+manual (`workflow_dispatch`) because the checks it repeats already run locally before each commit.
 
 To ship from a terminal instead: `npx vercel --prod`.
 

@@ -5,9 +5,16 @@
  */
 import { chromium } from '@playwright/test';
 import { preview } from 'vite';
+import { globSync } from 'node:fs';
+
+/** Same browser the harness uses; Playwright's own default path is the headless shell, absent here. */
+const chromePath =
+  process.env.CHROME_PATH ||
+  globSync('/opt/pw-browsers/chromium-*/chrome-linux/chrome')[0] ||
+  undefined;
 
 const server = await preview({ preview: { port: 4321, host: '127.0.0.1' }, logLevel: 'error' });
-const browser = await chromium.launch({ executablePath: process.env.CHROME_PATH });
+const browser = await chromium.launch({ executablePath: chromePath });
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
 const problems = [];
 page.on('pageerror', (e) => problems.push(`PAGEERROR ${e.message}`));
@@ -35,6 +42,31 @@ console.log(
   '| icons:',
   manifest.json.icons.length,
 );
+
+// The OS file association is built entirely from these manifest members, so a build that drops
+// them silently loses "Open with → Monet" (docs/07 §10).
+const handlers = manifest.json.file_handlers ?? [];
+const extensions = handlers.flatMap((h) => Object.values(h.accept ?? {}).flat());
+console.log(
+  'file_handlers:',
+  handlers.length,
+  '| extensions:',
+  extensions.join(' '),
+  '| actions:',
+  [...new Set(handlers.map((h) => h.action))].join(','),
+);
+console.log('launch_handler:', JSON.stringify(manifest.json.launch_handler));
+for (const want of ['.png', '.jpg', '.webp', '.bmp', '.gif', '.ico', '.monet']) {
+  if (!extensions.includes(want)) problems.push(`MANIFEST missing file handler for ${want}`);
+}
+// An action outside the served paths would 404 on launch: there is no catch-all rewrite.
+for (const h of handlers) {
+  const res = await page.evaluate(
+    async (a) => (await fetch(a, { method: 'GET' })).status,
+    new URL(h.action, 'http://127.0.0.1:4321/').href,
+  );
+  if (res >= 400) problems.push(`MANIFEST file handler action ${h.action} → HTTP ${res}`);
+}
 
 const sw = await page.evaluate(async () => {
   const res = await fetch('./sw.js');

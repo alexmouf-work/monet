@@ -155,7 +155,42 @@ layers/<id>.raw              each RasterLayer's pixels, raw RGBA bytes (W·H·4)
 - On boot, existing entries raise a **Recover work?** dialog: list (name, age,
   16-px thumbnail decoded from the bytes), buttons Open / Discard per row.
 
-## 10. Acceptance
+## 10. Opening from the OS file manager ("Open with Monet") — owner request 2026-08-10
+
+Windows Explorer (and Finder, and `xdg-open`) can hand image files straight to Monet, via the
+**File Handling API**: manifest `file_handlers` + `window.launchQueue`.
+
+- **Manifest** (`vite.config.ts`): one handler for images
+  (`.png .jpg .jpeg .webp .bmp .gif .ico`) and one for `.monet`. `action` must be a URL the host
+  actually serves — Monet has no client-side routing and no catch-all rewrite (docs/ARCHITECTURE
+  §Hosting), so it is the app root `/`; the files arrive through `launchQueue`, not the URL. No
+  per-handler `icons`, deliberately: they would repaint every associated file in Explorer with
+  Monet's icon. `launch_type` stays default (`single-client`), so selecting several files is one
+  launch carrying all of them. `launch_handler.client_mode = 'focus-existing'` reuses the open
+  window, so files land as extra document tabs rather than extra windows.
+- **Consumer** (`app/launchFiles.ts`): `launchQueue.setConsumer` is registered at boot **before
+  any await** — the queue holds a launch only until a consumer exists. It is **idempotent**:
+  StrictMode runs mount effects twice in dev, and a second consumer opened every file twice.
+- **The handles are `FileSystemFileHandle`s**, the same objects the save picker returns, so each
+  document is bound with `rememberHandle` and `Ctrl+S` **overwrites the file that was opened**,
+  in place, no dialog (§8's routing already does this once a handle exists). Write permission is
+  requested at save time, not at launch.
+- Per-file failures (a moved or revoked handle) toast the filename and continue with the rest.
+
+### 10.1 Installation is the precondition
+
+Chromium registers the associations with the OS **when the PWA is installed** — a browser tab can
+never appear in "Open with". So installation is a feature, not a nicety: `app/installPrompt.ts`
+keeps the `beforeinstallprompt` event (the browser fires it once and it is single-use, so it must
+be captured and `preventDefault`ed) and `ui/InstallBanner.tsx` offers an **Install** button whose
+copy names the payoff. Dismissal persists in `localStorage['monet.install.dismissed']`; the banner
+hides itself when `display-mode: standalone` says Monet is already installed.
+
+**Support**: Chromium desktop only (Chrome/Edge on Windows, macOS, Linux). Firefox and Safari
+implement neither piece, so there the banner falls back to the plain install pitch and files are
+opened by drag-and-drop or `Ctrl+O` as before. Nothing regresses.
+
+## 11. Acceptance
 
 - Export each format from a 16×16 test doc with semi-transparency:
   PNG round-trips exactly; JPEG mattes white; WebP appears only on Chromium; ICO
@@ -169,3 +204,8 @@ layers/<id>.raw              each RasterLayer's pixels, raw RGBA bytes (W·H·4)
   permission grant; fallback path downloads.
 - Kill the tab mid-edit → relaunch offers recovery; recovered doc matches the last
   autosave tick.
+- Installed on Windows: right-click a PNG → **Open with → Monet** opens it in the app window;
+  editing and `Ctrl+S` overwrite that same file with no dialog; selecting three PNGs opens three
+  tabs in one window.
+- The built `manifest.webmanifest` contains both `file_handlers` entries, every extension above,
+  and an `action` that resolves (asserted by `tests/manual/prodboot.mjs`).
