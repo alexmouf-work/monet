@@ -6,6 +6,10 @@ definition of done. Don't start Mn+1 with Mn's checklist red.
 
 A usable pixel editor exists from **M3**; the full owner workflow lands at **M11**.
 
+**M13–M19 (3D model mode) are specified separately in `docs/11-3d-model-mode.md` §16** and are
+not yet started. They follow the same rule: each ends runnable and demoable, and M13 alone is
+already useful (view a model, jump from a face to its texture).
+
 ## M0 — Scaffold & rails
 Vite React-TS app in the repo root; ESLint + Prettier; Vitest wired
 (`npm test`); Playwright wired with one trivial spec; GitHub Actions workflow

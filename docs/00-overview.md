@@ -113,10 +113,17 @@ alignment, colour + opacity, 360° rotation, multiline, in-canvas editing, optio
 ## 4. Explicit exclusions
 
 Not in scope, at any priority — do not build:
-3D shapes/models/library, stickers, magic select, Paint 3D "effects" filters, the
+Paint 3D's *3D shape library and stickers*, magic select, Paint 3D "effects" filters, the
 extra Paint 3D brushes (pencil, crayon, spray can, calligraphy, oil, watercolour),
-free-form (lasso) selection, animation/`.mcmeta` editing, multi-user collaboration,
-any server component.
+free-form (lasso) selection, animation/`.mcmeta` editing, multi-user collaboration.
+
+**Amended 2026-08-10** — two of these no longer hold:
+
+- *"3D shapes/models"* → **3D model mode is in scope** on owner request: Minecraft models in a
+  real 3D viewport, painted with the same brushes, with Blockbench-grade modelling. That is a
+  different thing from Paint 3D's clip-art 3D library, which stays excluded. Spec: `docs/11`.
+- *"any server component"* → one stateless Edge Function for GitHub App sign-in (D1, `docs/08`
+  §4.1). The editor still needs no server.
 
 ## 5. Standing assumptions (owner may veto — each is one small change)
 

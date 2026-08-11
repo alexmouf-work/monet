@@ -7,9 +7,10 @@ Update rules: CLAUDE.md §Progress docs.
 
 Client-side Paint 3D-style 2D editor + Minecraft/GitHub texture workflow.
 Full feature inventory (the contract): `docs/00-overview.md` §3.
-Exclusions (do not build): §4 — 3D anything, stickers, magic select, extra Paint 3D
-brushes, lasso select, effects beyond noise/recolour, animation/mcmeta editing,
-collaboration, any server component.
+Exclusions (do not build): §4 — stickers, magic select, extra Paint 3D brushes, lasso
+select, effects beyond noise/recolour, animation/mcmeta editing, collaboration.
+**"3D anything" and "any server component" no longer apply** — see the superseded table.
+3D model mode is specified in `docs/11-3d-model-mode.md` (spec only, M13–M19, nothing built).
 
 ## Durable owner decisions
 
@@ -32,6 +33,7 @@ collaboration, any server component.
 | 2026-08-10 | Serverless functions are **allowed** (owner) — superseding "static output, no serverless functions". Exactly one exists, `api/github/token.ts`, because GitHub's token endpoint needs the client secret and sends no CORS headers. It is stateless and stores nothing. |
 | 2026-08-10 | The owner also has a **Hetzner server** available for anything needing persistence. Not used by sign-in, which is stateless — noted so a future feature that genuinely needs storage knows the option exists. |
 | 2026-08-10 | Image files **open in Monet from the OS file manager** (Explorer "Open with"), and `Ctrl+S` then overwrites that file in place. Requires the PWA to be installed, so an install banner exists whose pitch is exactly that. Chromium desktop only; other browsers keep drag-and-drop + Ctrl+O. |
+| 2026-08-10 | **3D model mode is in scope** (owner request): load a Minecraft model + its texture/atlas, orbit and pan it, paint on it with the existing brushes, jump from a face to its texture, and build models (Blockbench capability, Onshape interaction). Spec: `docs/11`. Two decisions still open before M13 — renderer (raw WebGL2 recommended vs three.js) and 3D navigation mapping. |
 | spec | Design decisions D1–D8 and vetoable assumptions A1–A8: `docs/00-overview.md` §1, §5. PDF fit interpretation (contain; long-edges coincide for aspect ≥ √2): `docs/07` §6. |
 
 ## Shipped
@@ -68,4 +70,6 @@ browser. See docs/ARCHITECTURE.md for the as-built map and ROADMAP.csv for per-m
 | 2026-08-09 | Deploy target: GitHub Pages workflow → **Vercel** (owner request). `.github/workflows/deploy.yml` deleted; `vercel.json` added. CI in `.github/` still lints/tests/builds. |
 | 2026-08-09 | "Light theme, hard-code the palette; theme work is polish, not v1 scope" (docs/09 preamble) → **superseded**: owner asked for a dark mode, so the palette is tokenised and there are three theme states. (docs/09 §9 rewritten) |
 | 2026-08-10 | "Static output, no serverless functions — nothing in Monet needs a server" (D1) → **one Edge Function**, for the GitHub App token exchange only. Forced by GitHub: the exchange needs the client secret and the endpoint has no CORS, so there is no browser-only route. |
+| 2026-08-10 | Scope exclusion "**3D anything**" (docs/00 §4) → **superseded**: 3D model mode is in scope, specified in docs/11. 2D documents are unaffected — the 3D viewport is an addition, not a migration. |
+| 2026-08-10 | "Canvas 2D; **no WebGL**, no workers" (docs/01 §1) → WebGL2 is permitted **for the 3D viewport only**, pending the renderer decision in docs/11 §D11.1. |
 | 2026-08-09 | Brushes' `cursor: none` → **`crosshair`** (owner request). The overlay outline is 1–2 px wide at low zoom, so hiding the pointer left nothing to track. (docs/02 §3.4, docs/09 §8) |

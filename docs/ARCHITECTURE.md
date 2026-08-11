@@ -9,6 +9,9 @@ numbered spec (`docs/00`–`docs/10`) — do not duplicate it here; describe rea
 Every feature in `docs/00 §3` is implemented and exercised in a real browser. 117 unit tests
 (`src/core` plus the pure GitHub OAuth helpers); behaviour verified by harness scenarios (below).
 
+**Not built, specified**: 3D model mode (`docs/11-3d-model-mode.md`, milestones M13–M19). Nothing
+in this file describes it; add modules here only as they land.
+
 ## Tree
 
 ```
