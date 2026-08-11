@@ -12,7 +12,7 @@ import { useViewStore } from './viewStore';
 import { useSettingsStore } from './settingsStore';
 import { compositePixels } from '../engine/compose';
 import { activeRenderer } from '../engine/renderer';
-import { modelHover, modelRenderer } from '../ui/ModelWorkspace';
+import { modelHover, modelRenderer } from './modelViewState';
 import { getComposeOpts } from '../ui/sceneHooks';
 import { editingTextId } from '../tools/textTool';
 

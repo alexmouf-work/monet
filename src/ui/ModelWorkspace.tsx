@@ -7,7 +7,7 @@
 import { useEffect, useRef } from 'react';
 import { useDocStore } from '../app/docStore';
 import { onInvalidate, invalidate } from '../app/bus';
-import { modelTextures } from '../app/modelActions';
+import { modelTextures, openFaceTexture } from '../app/modelActions';
 import { themeColors } from '../engine/themeColors';
 import { ModelRenderer, type ModelScene } from '../engine3d/glRenderer';
 import {
@@ -23,35 +23,22 @@ import { modelBounds } from '../core/model3d/geometry';
 import { faceKey } from '../core/model3d/geometry';
 import { pickModel } from '../core/model3d/pick';
 import type { FaceHit, Model3D } from '../core/model3d/types';
+import {
+  modelHover as hoverNow,
+  modelRenderer as rendererNow,
+  reportHover,
+  setModelRenderer,
+  subscribeModelHover,
+} from '../app/modelViewState';
 import { isTypingTarget } from './Workspace';
 
 /** 3D view prefs shared with panels; module state — no store ceremony needed yet. */
 export const viewPrefs = { flatShade: false, grid: true };
 
-let activeModelRenderer: ModelRenderer | null = null;
-export const modelRenderer = () => activeModelRenderer;
-
-/** Hover state for the status bar and the renderer, coalesced like 2D's reportCursor. */
-let hover: FaceHit | null = null;
-const hoverListeners = new Set<() => void>();
-let hoverFlush = 0;
-
-function reportHover(h: FaceHit | null) {
-  hover = h;
-  if (hoverFlush) return;
-  hoverFlush = requestAnimationFrame(() => {
-    hoverFlush = 0;
-    for (const fn of hoverListeners) fn();
-  });
-}
-
-export const modelHover = () => hover;
-export function subscribeModelHover(fn: () => void) {
-  hoverListeners.add(fn);
-  return () => {
-    hoverListeners.delete(fn);
-  };
-}
+// Hover + renderer registry live in app/modelViewState (no ui imports) so debugBridge can
+// read them without dragging the ui module graph into its import chain.
+export { modelHover } from '../app/modelViewState';
+export { subscribeModelHover };
 
 /** Mutate the active model's camera and repaint — camera moves are not undo steps. */
 export function updateCamera(fn: (m: Model3D) => void): void {
@@ -66,6 +53,26 @@ export function frameModel(): void {
     const b = modelBounds(m.elements);
     m.camera = frame(m.camera, b.min, b.max);
   });
+}
+
+/**
+ * Enter's target: the hovered face when the cursor is over one, else the face at the
+ * viewport centre — literally "the one I am looking at" (docs/11 §9.1).
+ */
+export function lookedAtFace(): FaceHit | null {
+  const model = useDocStore.getState().activeModel();
+  if (!model) return null;
+  const hovered = hoverNow();
+  if (hovered) return hovered;
+  const r = rendererNow();
+  const aspect = r ? r.cssW / Math.max(1, r.cssH) : 1;
+  return pickModel(model.elements, screenRay(model.camera, aspect, 0, 0));
+}
+
+export function openLookedAtTexture(wholeSheet = false): void {
+  const model = useDocStore.getState().activeModel();
+  const hit = lookedAtFace();
+  if (model && hit) void openFaceTexture(model, hit, { wholeSheet });
 }
 
 export function snapView(view: StandardView, orthographic = true): void {
@@ -97,7 +104,7 @@ export function ModelWorkspace() {
           fov: 50,
         },
         textures: model ? modelTextures(model.id) : new Map(),
-        hoverKey: hover ? faceKey(hover.elementId, hover.face) : -1,
+        hoverKey: hoverNow() ? faceKey(hoverNow()!.elementId, hoverNow()!.face) : -1,
         surround: themeColors().surround,
         flatShade: viewPrefs.flatShade,
         grid: viewPrefs.grid,
@@ -105,7 +112,7 @@ export function ModelWorkspace() {
     };
 
     const renderer = new ModelRenderer(canvas, getScene);
-    activeModelRenderer = renderer;
+    setModelRenderer(renderer);
     renderer.start();
 
     const ro = new ResizeObserver(() => {
@@ -161,10 +168,25 @@ export function ModelWorkspace() {
     };
 
     const endDrag = (e: PointerEvent) => {
+      // A middle CLICK (no drag) opens the face's texture (docs/11 §9.1); the 3-px slop is
+      // what separates it from the start of an orbit.
       const wasMiddleClick = drag === 'orbit' && e.button === 1 && moved < 3;
       drag = null;
-      // A middle CLICK (no drag) opens the face's texture in M14 — recorded for then.
-      void wasMiddleClick;
+      if (wasMiddleClick) {
+        const model = useDocStore.getState().activeModel();
+        const ray = rayAt(e);
+        const hit = model && ray ? pickModel(model.elements, ray) : null;
+        if (model && hit) void openFaceTexture(model, hit);
+      }
+    };
+
+    const onDoubleClick = (e: MouseEvent) => {
+      const model = useDocStore.getState().activeModel();
+      if (!model) return;
+      const ray = rayAt(e as unknown as PointerEvent);
+      const hit = ray ? pickModel(model.elements, ray) : null;
+      if (hit) void openFaceTexture(model, hit);
+      else frameModel(); // double-click empty space: harmless, discoverable (docs/11 §9.1)
     };
 
     const onPointerLeave = () => reportHover(null);
@@ -188,6 +210,7 @@ export function ModelWorkspace() {
       if (e.code === 'Space') spaceRef.current = false;
     };
 
+    canvas.addEventListener('dblclick', onDoubleClick);
     canvas.addEventListener('pointerdown', onPointerDown);
     canvas.addEventListener('pointermove', onPointerMove);
     canvas.addEventListener('pointerup', endDrag);
@@ -200,6 +223,7 @@ export function ModelWorkspace() {
     return () => {
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
+      canvas.removeEventListener('dblclick', onDoubleClick);
       canvas.removeEventListener('pointerdown', onPointerDown);
       canvas.removeEventListener('pointermove', onPointerMove);
       canvas.removeEventListener('pointerup', endDrag);
@@ -209,7 +233,7 @@ export function ModelWorkspace() {
       offHover();
       ro.disconnect();
       renderer.dispose();
-      if (activeModelRenderer === renderer) activeModelRenderer = null;
+      if (rendererNow() === renderer) setModelRenderer(null);
     };
   }, []);
 

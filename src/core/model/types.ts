@@ -105,6 +105,11 @@ export interface Background {
 export interface SourceBinding {
   sourceId: string;
   path: string; // repo/folder-relative PNG path
+  /**
+   * When set, this document is an on-demand extraction of one rectangle of a sheet/atlas
+   * (docs/11 §9.2): saving blits the region back into the sheet instead of replacing the file.
+   */
+  region?: Rect;
 }
 
 export interface MonetDoc {

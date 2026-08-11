@@ -15,7 +15,11 @@ import {
 } from '../core/model3d/javaModel';
 import { builtinParent } from '../core/model3d/vanillaParents';
 import { decodeImage } from '../engine/exporters';
-import { listSources, type SourceProvider } from '../integrations/sources';
+import { getSource, listSources, type SourceProvider } from '../integrations/sources';
+import { MAX_DIM, type Rect } from '../core/model/types';
+import { createDoc } from '../core/model/document';
+import type { FaceHit } from '../core/model3d/types';
+import { copyRect } from '../core/raster/pixels';
 import { toast } from './bus';
 import { useDocStore } from './docStore';
 
@@ -179,6 +183,119 @@ export async function openModelFromSource(source: SourceProvider, path: string):
 function boundsOf(resolved: { elements: Model3D['elements'] }) {
   const b = modelBounds(resolved.elements);
   return [b.min, b.max] as const;
+}
+
+// ------------------------------------------------------------------ face → texture (docs/11 §9)
+
+/** The face's uv rect in TEXTURE PIXELS, normalized so inverted uvs still give w,h > 0. */
+export function faceUVRect(model: Model3D, hit: FaceHit): Rect | null {
+  const el = model.elements.find((e) => e.id === hit.elementId);
+  const face = el?.faces[hit.face];
+  const ref = model.textures[hit.textureVar];
+  if (!face || !ref || ref.kind === 'unresolved') return null;
+  const texW = ref.kind === 'file' ? ref.width : ref.rect.w;
+  const texH = ref.kind === 'file' ? ref.height : ref.rect.h;
+  const [u1, v1, u2, v2] = face.uv;
+  const x0 = (Math.min(u1, u2) / 16) * texW;
+  const y0 = (Math.min(v1, v2) / 16) * texH;
+  const x1 = (Math.max(u1, u2) / 16) * texW;
+  const y1 = (Math.max(v1, v2) / 16) * texH;
+  return {
+    x: Math.floor(x0),
+    y: Math.floor(y0),
+    w: Math.max(1, Math.round(x1 - x0)),
+    h: Math.max(1, Math.round(y1 - y0)),
+  };
+}
+
+/**
+ * Open the texture behind a face — docs/11 §9.2. `file` refs open the whole PNG with the
+ * face's uv rect selected; `region` refs extract the rectangle on demand into a document
+ * whose binding writes back into the sheet. `wholeSheet` (Ctrl+Enter) forces the full file
+ * even for a region ref.
+ */
+export async function openFaceTexture(
+  model: Model3D,
+  hit: FaceHit,
+  opts: { wholeSheet?: boolean } = {},
+): Promise<void> {
+  const ref = model.textures[hit.textureVar];
+  if (!ref || ref.kind === 'unresolved') {
+    toast(`#${hit.textureVar} is unresolved — connect a jar with its assets.`, 'error');
+    return;
+  }
+  const ds = useDocStore.getState();
+  const sourceId = ref.sourceId;
+  const path = ref.path;
+  const region: Rect | undefined = ref.kind === 'region' && !opts.wholeSheet ? ref.rect : undefined;
+
+  // Re-focus an existing tab rather than opening a second truth (docs/11 §9.2).
+  const existing = Object.values(ds.docs).find(
+    (d) =>
+      d.binding?.sourceId === sourceId &&
+      d.binding.path === path &&
+      JSON.stringify(d.binding.region ?? null) === JSON.stringify(region ?? null),
+  );
+  if (existing) {
+    ds.setActive(existing.id);
+    if (!region) selectFaceRect(existing.id, model, hit);
+    return;
+  }
+
+  const provider = getSource(sourceId);
+  if (!provider) {
+    toast('The texture’s source is no longer connected.', 'error');
+    return;
+  }
+  try {
+    const bytes = provider.readPath
+      ? await provider.readPath(path)
+      : (await provider.read({ path })).png;
+    const decoded = await decodeImage(new Blob([bytes as BlobPart], { type: 'image/png' }));
+    if (decoded.width > MAX_DIM || decoded.height > MAX_DIM) {
+      toast(`${path} is larger than ${MAX_DIM}px.`, 'error');
+      return;
+    }
+    const name = path
+      .split('/')
+      .pop()!
+      .replace(/\.png$/i, '');
+
+    if (region) {
+      // On-demand extraction: the document is the region's pixels; the binding remembers the
+      // rectangle so Ctrl+S blits it back into the sheet (integrations/sourceSave).
+      const pixels = copyRect(decoded.pixels, decoded.width, region);
+      const doc = createDoc({
+        name: `${name} @${region.x},${region.y}`,
+        width: region.w,
+        height: region.h,
+        pixels,
+      });
+      doc.binding = { sourceId, path, region };
+      ds.addDoc(doc);
+      return;
+    }
+
+    const doc = createDoc({
+      name,
+      width: decoded.width,
+      height: decoded.height,
+      pixels: decoded.pixels,
+    });
+    doc.binding = { sourceId, path };
+    ds.addDoc(doc);
+    selectFaceRect(doc.id, model, hit);
+  } catch (err) {
+    toast(`Could not open ${path}: ${(err as Error).message}`, 'error');
+  }
+}
+
+/** Select the face's uv rect in the (now active) image document so the area is obvious. */
+function selectFaceRect(docId: string, model: Model3D, hit: FaceHit): void {
+  const ds = useDocStore.getState();
+  const rect = faceUVRect(model, hit);
+  if (!rect || ds.activeId !== docId) return;
+  ds.setSelection({ rect });
 }
 
 /**

@@ -184,7 +184,13 @@ const log = (...a) => console.log(' ', ...a);
 // ---------------------------------------------------------------- run
 console.log(`harness: ${scenarioPath} → ${outDir} (${headed ? 'headed' : 'headless'})`);
 await page.goto(base, { waitUntil: 'networkidle' });
-await page.waitForFunction(() => !!window.__monet, null, { timeout: 15_000 });
+await page
+  .waitForFunction(() => !!window.__monet, null, { timeout: 15_000 })
+  .catch((err) => {
+    // Boot failure: print what the page saw before dying, or nobody can diagnose it.
+    console.error('APP DID NOT BOOT:', problems.join('\n') || '(no page errors captured)');
+    throw err;
+  });
 
 let failure = null;
 try {

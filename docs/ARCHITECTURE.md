@@ -9,7 +9,7 @@ numbered spec (`docs/00`–`docs/10`) — do not duplicate it here; describe rea
 Every feature in `docs/00 §3` is implemented and exercised in a real browser. 117 unit tests
 (`src/core` plus the pure GitHub OAuth helpers); behaviour verified by harness scenarios (below).
 
-**3D model mode**: M13 (viewport) is built; M14–M19 remain specified in `docs/11-3d-model-mode.md`.
+**3D model mode**: M13 (viewport) and M14 (face→texture + live link) are built; M15–M19 remain specified in `docs/11-3d-model-mode.md`.
 
 ## Tree
 
@@ -64,7 +64,10 @@ src/app/                               stores + action layer
   fileActions exportActions editActions selectionActions canvasActions
   adjustSession.ts                     shared preview/bake for noise + recolour
   themeMode.ts                         system|light|dark, data-theme stamping
-  modelActions.ts                      open models from sources; per-doc texture pixel store
+  modelActions.ts                      open models from sources; per-doc texture pixel store;
+                                       face→texture opening (uv-rect selection, region extract)
+  modelTextureSync.ts                  the live 2-way link: open image docs ARE their textures
+  modelViewState.ts overlayRegistry.ts leaf modules: hover/renderer registry, overlay painters
   launchFiles.ts                       OS "open with" launches → docs bound to their handles
   installPrompt.ts                     beforeinstallprompt capture (installing enables that)
   autosave.ts debugBridge.ts
@@ -105,7 +108,8 @@ Scenarios: `smoke` · `full` · `layering` (the owner's scenario) · `text` · `
 handler costs) · `eyedropper-shapes-clipboard` (the three 2026-08-09 owner requests) ·
 `github-login` (the App sign-in flow against a mocked GitHub) · `file-handler` (an OS launch,
 with fake handles that record what gets written back) · `model3d` (M13 acceptance against a
-fixture jar with a real parent chain). Fixture jars are built fresh each run by
+fixture jar with a real parent chain) · `model3d-face` (M14: face→texture triggers, uv-rect
+selection, the live 2-way link, uv guides). Fixture jars are built fresh each run by
 `tests/manual/fixtures/jar.mjs` (Node-side zip + hand-rolled PNG encoder) — nothing depends on
 leftover /tmp files. The harness launches Chromium with swiftshader flags so WebGL2 works
 headless.
@@ -255,6 +259,10 @@ submission, not GPU rasterisation.
 - Geometry of one colour that overlaps itself must be composited **once** (`singlePass`, or a
   single crisp pass). Two passes double-blend the overlap, which shows as a darker seam at any
   alpha below 1.
+- **Registries that get written during module evaluation live in LEAF modules** (zero runtime
+  imports — `app/overlayRegistry`, `app/modelViewState`). Tools register overlay painters at
+  module-eval time from inside the sceneHooks→tools import cycle; a registry declared in a
+  cycling module hits its own TDZ and takes the whole boot down.
 - **Never `loseContext()` on a canvas another renderer may reuse.** A canvas keeps its one WebGL
   context forever; StrictMode's double mount made the second renderer compile shaders into a
   permanently lost context (null info logs — maddening). Dispose deletes GL objects instead.

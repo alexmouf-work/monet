@@ -4,7 +4,7 @@ import { useDocStore } from '../app/docStore';
 import { useViewStore } from '../app/viewStore';
 import { useToolStore, type FeatureTab, type ToolId } from '../app/toolStore';
 import { getTool } from '../tools';
-import { frameModel, snapView, updateCamera } from './ModelWorkspace';
+import { frameModel, openLookedAtTexture, snapView, updateCamera } from './ModelWorkspace';
 import { nudgeSelected } from '../tools/selectTool';
 import { anchorSelection } from '../app/selectionActions';
 import { isTypingTarget } from './Workspace';
@@ -33,6 +33,10 @@ export interface ShortcutActions {
 /** 3D navigation — digits mirror the classic CAD numpad views (docs/11 §12). */
 function handleModelKey(e: KeyboardEvent): boolean {
   switch (e.code) {
+    case 'Enter':
+    case 'NumpadEnter':
+      openLookedAtTexture(false);
+      return true;
     case 'Digit1':
       snapView('front');
       return true;
@@ -111,6 +115,15 @@ export function useShortcuts(actions: ShortcutActions) {
       }
 
       if (mod) {
+        if (
+          (e.code === 'Enter' || e.code === 'NumpadEnter') &&
+          ds.activeId &&
+          ds.models[ds.activeId]
+        ) {
+          e.preventDefault();
+          openLookedAtTexture(true); // whole sheet, even for a region ref (docs/11 §9.1)
+          return;
+        }
         switch (e.code) {
           case 'KeyZ':
             e.preventDefault();

@@ -8,6 +8,8 @@ import { openFile, openLocalFiles, saveDoc, saveDocAs, saveProjectAs } from './a
 import { listAutosaves } from './integrations/idb';
 import { completeSignIn } from './integrations/github/auth';
 import { dropModelTextures } from './app/modelActions';
+import { startModelTextureSync } from './app/modelTextureSync';
+import { installUVGuides } from './ui/uvGuides';
 import { startFileHandling } from './app/launchFiles';
 import { watchInstallability } from './app/installPrompt';
 import { selectAll } from './tools/marquee';
@@ -74,6 +76,8 @@ export function App() {
     // until a consumer exists, and only the first consumer counts (docs/07 §10).
     startFileHandling();
     const stopInstallWatch = watchInstallability();
+    const stopTextureSync = startModelTextureSync();
+    installUVGuides();
     // If this load is the GitHub OAuth callback, finish the sign-in and clean up the URL
     // (docs/08 §4.1). A no-op on every other load.
     void completeSignIn();
@@ -88,6 +92,7 @@ export function App() {
     return () => {
       stop();
       stopInstallWatch();
+      stopTextureSync();
     };
   }, []);
 

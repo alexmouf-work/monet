@@ -4,6 +4,7 @@
  * screen-space overlay painters. Tools and panels write here; the renderer reads.
  */
 import type { ComposeOpts, StrokeOverlay } from '../engine/compose';
+import { overlayPainters } from '../app/overlayRegistry';
 import { ctx2d, imageDataFrom, makeCanvas } from '../engine/layerCache';
 import type { View } from '../engine/viewport';
 import { useDocStore, type FloatingSelection } from '../app/docStore';
@@ -40,18 +41,11 @@ export function getComposeOpts(): ComposeOpts {
   };
 }
 
-export type OverlayPainter = (ctx: CanvasRenderingContext2D, view: View) => void;
+export { registerOverlayPainter, type OverlayPainter } from '../app/overlayRegistry';
 
-const painters: OverlayPainter[] = [];
-
-/** Registered by selection/object chrome modules; drawn after the active tool's overlay. */
-export function registerOverlayPainter(p: OverlayPainter): void {
-  painters.push(p);
-}
-
-export function getOverlayPainter(): OverlayPainter {
+export function getOverlayPainter(): (ctx: CanvasRenderingContext2D, view: View) => void {
   return (ctx, view) => {
     getTool(useToolStore.getState().active).drawOverlay?.(ctx, view);
-    for (const p of painters) p(ctx, view);
+    for (const p of overlayPainters()) p(ctx, view);
   };
 }

@@ -5,7 +5,7 @@
  */
 import type { MonetDoc } from '../core/model/types';
 import { renderComposite } from './compose';
-import { ctx2d, makeCanvas } from './layerCache';
+import { ctx2d, imageDataFrom, makeCanvas } from './layerCache';
 
 export type RasterFormat = 'png' | 'jpeg' | 'webp';
 
@@ -75,6 +75,17 @@ export async function exportRaster(
 
 export const exportPngBytes = async (doc: MonetDoc): Promise<Uint8Array> =>
   new Uint8Array(await (await exportRaster(doc, 'png')).arrayBuffer());
+
+/** Raw RGBA → PNG bytes, for writers that patch pixels outside any document (sheet blits). */
+export async function encodePixelsToPng(
+  pixels: Uint8ClampedArray,
+  width: number,
+  height: number,
+): Promise<Uint8Array> {
+  const canvas = makeCanvas(width, height);
+  ctx2d(canvas).putImageData(imageDataFrom(pixels, width, height), 0, 0);
+  return new Uint8Array(await (await canvasToBlob(canvas, MIME.png)).arrayBuffer());
+}
 
 /** Nearest-neighbour rescale of a composite, used by ICO entries and thumbnails. */
 export function scaleNearest(
