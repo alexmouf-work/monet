@@ -1,6 +1,6 @@
 # 11 — 3D model mode (design)
 
-**Status: specification only. Nothing here is built** (2026-08-10). This is the contract for
+**Status: in build** (started 2026-08-10; owner approved, D11.1 = raw WebGL2, D11.2 = Onshape mapping). This is the contract for
 M13–M19; `docs/ARCHITECTURE.md` continues to describe what exists.
 
 Supersedes the exclusion "3D anything" in `docs/00 §4` / `docs/CONTEXT.md §Scope` — owner request
@@ -36,7 +36,7 @@ or shader work, importing arbitrary triangle meshes (OBJ/glTF), physics, multipl
 
 These change the shape of the work; everything else follows from them.
 
-### D11.1 — Renderer: raw WebGL2 (recommended) vs three.js
+### D11.1 — Renderer: raw WebGL2 (recommended) vs three.js — **DECIDED: raw WebGL2** (owner, 2026-08-10)
 
 | | raw WebGL2 | three.js |
 | --- | --- | --- |
@@ -55,7 +55,7 @@ it is a one-way door, so decide before M13 rather than during.
 *(WebGL2 supersedes docs/01 §1's "Canvas 2D; no WebGL". 2D documents keep their Canvas 2D
 renderer untouched — this is an addition, not a migration.)*
 
-### D11.2 — Navigation mapping
+### D11.2 — Navigation mapping — **DECIDED: the Onshape-leaning table below** (owner, 2026-08-10)
 
 Monet's 2D mode already means: middle-drag = pan, `Space`+drag = pan, wheel = zoom at cursor.
 Blockbench uses left-drag to orbit; Onshape uses middle-drag to orbit and `Ctrl`+middle to pan.
@@ -522,8 +522,9 @@ existing export pipeline once the framebuffer is read back.
 | 8 | Animated textures (`.mcmeta` strips) | Show frame 0; paint the strip as a whole; animation preview is a later item |
 | 9 | Scope: this is comparable in size to everything built so far | Milestones are independently useful — M13 alone (view + face→texture) is already a better texture workflow than none |
 
-**Open questions for the owner**: D11.1 renderer, D11.2 navigation, and whether Bedrock
-`.geo.json` matters in v1 or Java-only is enough to start.
+**Open questions for the owner**: ~~D11.1 renderer~~ (decided: raw WebGL2), ~~D11.2 navigation~~
+(decided: Onshape mapping), and whether Bedrock `.geo.json` matters in v1 or Java-only is
+enough to start (building Java-first until told otherwise).
 
 ---
 
