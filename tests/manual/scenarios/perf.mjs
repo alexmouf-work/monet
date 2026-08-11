@@ -4,7 +4,7 @@
  * polluted by Playwright's input pacing. Absolute values depend on the machine — this sandbox
  * runs software GL — so read them as before/after comparisons, not as a spec.
  */
-const CANVAS = '.workspace__canvas';
+const CANVAS = '.workspace:not(.workspace--model) .workspace__canvas';
 
 async function measure(label, state, log, run) {
   await state.resetPerf();
@@ -26,7 +26,7 @@ async function measure(label, state, log, run) {
  */
 async function handlerCost(label, page, log, n = 300) {
   const ms = await page.evaluate((count) => {
-    const el = document.querySelector('.workspace__canvas');
+    const el = document.querySelector('.workspace:not(.workspace--model) .workspace__canvas');
     const b = el.getBoundingClientRect();
     const t0 = performance.now();
     for (let i = 0; i < count; i++) {

@@ -126,7 +126,9 @@ export default async function ({ page, state, log, shot }) {
   // Editing then saving again must reuse the same handle rather than escalating to a picker.
   await page.keyboard.press('Control+z');
   await page.waitForTimeout(150);
-  const box = await page.locator('.workspace__canvas').boundingBox();
+  const box = await page
+    .locator('.workspace:not(.workspace--model) .workspace__canvas')
+    .boundingBox();
   await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
   await page.waitForTimeout(200);
   await page.keyboard.press('Control+s');

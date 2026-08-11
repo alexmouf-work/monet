@@ -30,6 +30,13 @@ export interface SourceProvider {
   read(node: TextureNode): Promise<{ png: Uint8Array; project?: Uint8Array }>;
   /** Write a texture plus its project mirror. Writable sources only. */
   write?(path: string, png: Uint8Array, project: Uint8Array): Promise<void>;
+  /**
+   * Bytes of an arbitrary source-relative path — model JSON, parent models, sheet textures.
+   * Providers that cannot serve raw paths simply omit it (docs/11 §4.2).
+   */
+  readPath?(path: string): Promise<Uint8Array>;
+  /** Minecraft model JSON paths (assets/<ns>/models/**.json), for the sidebar's Models list. */
+  listModels?(): Promise<string[]>;
   /** Extra status line for the sidebar (branch state, cache size …). */
   status?(): string;
   refresh?(): Promise<void>;

@@ -16,6 +16,7 @@ import {
 import { removeJarSource } from '../integrations/jar/jarSource';
 import { removeFolderSource } from '../integrations/fsa/folderSource';
 import { forgetRepo } from '../integrations/github/repoSource';
+import { openModelFromSource } from '../app/modelActions';
 
 const ICONS = { jar: '🫙', repo: '⎇', folder: '📁' } as const;
 
@@ -185,6 +186,7 @@ function SourceBlock({
 }) {
   const [open, setOpen] = useState(true);
   const [nodes, setNodes] = useState<TextureNode[] | null>(null);
+  const [models, setModels] = useState<string[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState('');
   const [loading, setLoading] = useState(false);
@@ -194,6 +196,7 @@ function SourceBlock({
     setError(null);
     try {
       setNodes(await source.list());
+      if (source.listModels) setModels(await source.listModels());
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -213,6 +216,14 @@ function SourceBlock({
     const list = f ? nodes.filter((n) => n.path.toLowerCase().includes(f)) : nodes;
     return list.slice(0, 400);
   }, [nodes, filter]);
+
+  // Models share the same filter box (docs/11 §11: same sidebar, one more node type).
+  const shownModels = useMemo(() => {
+    if (!models) return [];
+    const f = filter.trim().toLowerCase();
+    const list = f ? models.filter((m) => m.toLowerCase().includes(f)) : models;
+    return list.slice(0, 200);
+  }, [models, filter]);
 
   const remove = async () => {
     if (source.kind === 'jar') await removeJarSource(source.id);
@@ -270,6 +281,29 @@ function SourceBlock({
                 : ''}
               {!filter && nodes.length > 400 ? ' · showing first 400, use the filter' : ''}
             </div>
+          )}
+          {!!shownModels.length && (
+            <>
+              <div className="srcblock__note">
+                {models!.length} model{models!.length === 1 ? '' : 's'}
+                {!filter && models!.length > 200 ? ' · showing first 200, use the filter' : ''}
+              </div>
+              <ul className="srctree srctree--models">
+                {shownModels.map((path) => (
+                  <li key={path}>
+                    <button
+                      className="srctree__item"
+                      title={path}
+                      onClick={() => void openModelFromSource(source, path)}
+                    >
+                      <span className="srctree__thumb srctree__thumb--model">▣</span>
+                      <span className="srctree__name">{path.split('/').pop()}</span>
+                      <span className="srctree__path">{path}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </>
           )}
           <ul className="srctree">
             {shown.map((n) => (

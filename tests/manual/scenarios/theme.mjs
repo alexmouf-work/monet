@@ -10,7 +10,9 @@ export default async function ({ ui, shot, state, log, page }) {
   await ui.drag(await ui.atDoc(8, 8), await ui.atDoc(50, 40));
 
   // The brush must no longer hide the pointer.
-  const cursor = await page.locator('.workspace__canvas').evaluate((el) => el.style.cursor);
+  const cursor = await page
+    .locator('.workspace:not(.workspace--model) .workspace__canvas')
+    .evaluate((el) => el.style.cursor);
   log('brush cursor style:', JSON.stringify(cursor), cursor === 'crosshair' ? '✓ visible' : '✗');
   await shot('1-light');
 

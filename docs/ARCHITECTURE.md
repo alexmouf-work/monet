@@ -9,8 +9,7 @@ numbered spec (`docs/00`–`docs/10`) — do not duplicate it here; describe rea
 Every feature in `docs/00 §3` is implemented and exercised in a real browser. 117 unit tests
 (`src/core` plus the pure GitHub OAuth helpers); behaviour verified by harness scenarios (below).
 
-**Not built, specified**: 3D model mode (`docs/11-3d-model-mode.md`, milestones M13–M19). Nothing
-in this file describes it; add modules here only as they land.
+**3D model mode**: M13 (viewport) is built; M14–M19 remain specified in `docs/11-3d-model-mode.md`.
 
 ## Tree
 
@@ -39,6 +38,12 @@ src/core/                              PURE: no DOM, no React, all unit-tested
   recolor/{replace,tint}.ts
   io/{monetFile,ico,bmp,pdfFit,pdfExport}.ts
 
+src/core/model3d/                      PURE 3D: types, vec/mat4, orbit camera, java model
+  {types,vec,camera,javaModel,vanillaParents,geometry,pick}.ts    parsing, mesh, ray picking
+
+src/engine3d/glRenderer.ts             raw WebGL2 viewport (D11.1): mesh+line programs,
+                                       NEAREST textures, frontFace(CW), context-loss rebuild
+
 src/engine/                            DOM-facing rendering
   renderer.ts                          rAF loop gated on invalidate; surround, checker,
                                        grid, 3×3 tiling, overlays
@@ -59,6 +64,7 @@ src/app/                               stores + action layer
   fileActions exportActions editActions selectionActions canvasActions
   adjustSession.ts                     shared preview/bake for noise + recolour
   themeMode.ts                         system|light|dark, data-theme stamping
+  modelActions.ts                      open models from sources; per-doc texture pixel store
   launchFiles.ts                       OS "open with" launches → docs bound to their handles
   installPrompt.ts                     beforeinstallprompt capture (installing enables that)
   autosave.ts debugBridge.ts
@@ -74,6 +80,8 @@ src/integrations/
 src/ui/                                React; no business logic
   App.tsx TopBar Toolbar AppMenu DocTabs Workspace StatusBar OptionsPanel ColorPanel
   GithubAccount.tsx                    sign-in / signed-in block, shared by two dialogs
+  ModelWorkspace.tsx                   3D workspace: renderer lifecycle, Onshape navigation,
+                                       hover picking, DOM view cube; panels/ModelPanel.tsx
   InstallBanner.tsx                    install offer; its pitch is the file association
   SourcesSidebar TextEditOverlay UpdatePrompt sceneHooks useShortcuts fonts theme.css
   panels/{Brushes,Shapes,Text,Canvas,Noise,Recolour}Panel.tsx
@@ -96,7 +104,11 @@ Scenarios: `smoke` · `full` · `layering` (the owner's scenario) · `text` · `
 `theme` (toolbar wiring, brush cursor, theme cycling + persistence) · `perf` (frame and
 handler costs) · `eyedropper-shapes-clipboard` (the three 2026-08-09 owner requests) ·
 `github-login` (the App sign-in flow against a mocked GitHub) · `file-handler` (an OS launch,
-with fake handles that record what gets written back).
+with fake handles that record what gets written back) · `model3d` (M13 acceptance against a
+fixture jar with a real parent chain). Fixture jars are built fresh each run by
+`tests/manual/fixtures/jar.mjs` (Node-side zip + hand-rolled PNG encoder) — nothing depends on
+leftover /tmp files. The harness launches Chromium with swiftshader flags so WebGL2 works
+headless.
 
 `shot()` waits two `requestAnimationFrame`s before capturing. A full-page screenshot taken
 immediately after a CSS-only change (a theme toggle) can otherwise return the *previous*
@@ -243,6 +255,13 @@ submission, not GPU rasterisation.
 - Geometry of one colour that overlaps itself must be composited **once** (`singlePass`, or a
   single crisp pass). Two passes double-blend the overlap, which shows as a darker seam at any
   alpha below 1.
+- **Never `loseContext()` on a canvas another renderer may reuse.** A canvas keeps its one WebGL
+  context forever; StrictMode's double mount made the second renderer compile shaders into a
+  permanently lost context (null info logs — maddening). Dispose deletes GL objects instead.
+- 3D model docs live in `docStore.models`, parallel to `docs` and sharing order/activeId;
+  `active()` returns null for them so every 2D consumer degrades to its no-document state
+  unchanged. Both workspaces stay mounted; CSS hides the inactive one (`.workspace-slot`), so
+  selector-driven code must target `.workspace:not(.workspace--model)` for the 2D canvas.
 - The clipboard holds either pixels or an object. When both could apply, the system clipboard
   wins **unless** its bytes are the PNG we last wrote — that is our own object copy returning.
 - The text editing overlay commits on a real outside click, not on blur: the pointer-up that

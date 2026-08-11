@@ -12,6 +12,7 @@ import { useViewStore } from './viewStore';
 import { useSettingsStore } from './settingsStore';
 import { compositePixels } from '../engine/compose';
 import { activeRenderer } from '../engine/renderer';
+import { modelHover, modelRenderer } from '../ui/ModelWorkspace';
 import { getComposeOpts } from '../ui/sceneHooks';
 import { editingTextId } from '../tools/textTool';
 
@@ -26,6 +27,10 @@ export interface MonetDebug {
   /** Renderer frame costs since the last `resetPerf()` — the perf scenario's measuring stick. */
   perf(): { frames: number; totalMs: number; avgMs: number; maxMs: number; composites: number };
   resetPerf(): void;
+  /** Active 3D model document state, camera and hover — null when a 2D doc is focused. */
+  model(): unknown;
+  /** Centre pixel of the 3D framebuffer — the "did anything render" probe. */
+  modelCenterPixel(): number[] | null;
 }
 
 export function installDebugBridge(): void {
@@ -124,6 +129,42 @@ export function installDebugBridge(): void {
       s.maxMs = 0;
       s.lastMs = 0;
       s.composites = 0;
+    },
+    model() {
+      const m = useDocStore.getState().activeModel();
+      if (!m) return null;
+      return {
+        id: m.id,
+        name: m.name,
+        format: m.format,
+        elements: m.elements.length,
+        missing: m.missing,
+        textures: Object.fromEntries(
+          Object.entries(m.textures).map(([k, t]) => [
+            k,
+            t.kind === 'file' ? `${t.width}x${t.height}` : t.kind,
+          ]),
+        ),
+        camera: {
+          yaw: Math.round(m.camera.yaw * 10) / 10,
+          pitch: Math.round(m.camera.pitch * 10) / 10,
+          distance: Math.round(m.camera.distance * 10) / 10,
+          projection: m.camera.projection,
+          target: m.camera.target,
+        },
+        hover: modelHover()
+          ? {
+              elementId: modelHover()!.elementId,
+              face: modelHover()!.face,
+              u: Math.round(modelHover()!.uvNorm.u * 1000) / 1000,
+              v: Math.round(modelHover()!.uvNorm.v * 1000) / 1000,
+            }
+          : null,
+      };
+    },
+    modelCenterPixel() {
+      const r = modelRenderer();
+      return r ? [...r.readCenter()] : null;
     },
     pixelAt(x, y) {
       const d = useDocStore.getState().active();

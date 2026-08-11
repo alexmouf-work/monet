@@ -11,7 +11,12 @@ export function beforeLoad() {
   delete window.showDirectoryPicker;
 }
 
+import { writeTextureJar } from '../fixtures/jar.mjs';
+
 export default async function ({ page, ui, shot, state, log }) {
+  // The jar is built fresh every run — this used to lean on a leftover /tmp file.
+  await writeTextureJar('/tmp/fake.jar');
+
   // ---- mock api.github.com ------------------------------------------------------------
   const server = {
     branches: { main: 'sha_main_1', monet: 'sha_main_1' },

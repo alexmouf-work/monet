@@ -8,6 +8,7 @@ import type { Item, MonetDoc, Rect, SourceBinding } from '../core/model/types';
 import { isRaster } from '../core/model/types';
 import { HISTORY_LIMIT, type Command } from '../core/model/commands';
 import { createDoc } from '../core/model/document';
+import type { Model3D } from '../core/model3d/types';
 import { invalidateDoc, patchLayer } from '../engine/layerCache';
 import { invalidate } from './bus';
 
@@ -33,6 +34,14 @@ interface History {
 
 interface DocState {
   docs: Record<string, MonetDoc>;
+  /**
+   * Model documents (docs/11) share `order` and `activeId` with image documents but live in
+   * their own map — deliberately NOT the spec's single union type (deviation recorded in
+   * docs/11 §3): `active()` returning null for a model id means every existing 2D consumer
+   * degrades to its no-document state with zero changes, instead of every one of them
+   * learning a second document kind.
+   */
+  models: Record<string, Model3D>;
   order: string[];
   activeId: string | null;
   histories: Record<string, History>;
@@ -41,8 +50,10 @@ interface DocState {
   rev: number;
 
   active(): MonetDoc | null;
+  activeModel(): Model3D | null;
   bump(content?: boolean): void;
   addDoc(doc: MonetDoc): string;
+  addModel(doc: Model3D): string;
   newDoc(opts: Parameters<typeof createDoc>[0]): string;
   closeDoc(id: string): void;
   setActive(id: string): void;
@@ -74,6 +85,7 @@ function applyCaches(doc: MonetDoc, cmd: Command) {
 
 export const useDocStore = create<DocState>((set, get) => ({
   docs: {},
+  models: {},
   order: [],
   activeId: null,
   histories: {},
@@ -84,6 +96,11 @@ export const useDocStore = create<DocState>((set, get) => ({
   active() {
     const { docs, activeId } = get();
     return activeId ? (docs[activeId] ?? null) : null;
+  },
+
+  activeModel() {
+    const { models, activeId } = get();
+    return activeId ? (models[activeId] ?? null) : null;
   },
 
   bump(content = true) {
@@ -109,17 +126,33 @@ export const useDocStore = create<DocState>((set, get) => ({
     return get().addDoc(createDoc(opts));
   },
 
+  addModel(doc) {
+    set((s) => ({
+      models: { ...s.models, [doc.id]: doc },
+      order: [...s.order, doc.id],
+      activeId: doc.id,
+      selection: null,
+      selectedObjectId: null,
+      rev: s.rev + 1,
+    }));
+    invalidate();
+    return doc.id;
+  },
+
   closeDoc(id) {
     invalidateDoc(id);
     set((s) => {
       const docs = { ...s.docs };
       delete docs[id];
+      const models = { ...s.models };
+      delete models[id];
       const histories = { ...s.histories };
       delete histories[id];
       const order = s.order.filter((o) => o !== id);
       const activeId = s.activeId === id ? (order[order.length - 1] ?? null) : s.activeId;
       return {
         docs,
+        models,
         order,
         histories,
         activeId,
@@ -137,7 +170,7 @@ export const useDocStore = create<DocState>((set, get) => ({
   },
 
   renameDoc(id, name) {
-    const doc = get().docs[id];
+    const doc = get().docs[id] ?? get().models[id];
     if (doc) {
       doc.name = name;
       get().bump(false);
@@ -153,7 +186,7 @@ export const useDocStore = create<DocState>((set, get) => ({
   },
 
   markSaved(id) {
-    const doc = get().docs[id];
+    const doc = get().docs[id] ?? get().models[id];
     if (doc) {
       doc.dirty = false;
       get().bump(false);

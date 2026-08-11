@@ -7,6 +7,7 @@ import { autosaveNow, startAutosave } from './app/autosave';
 import { openFile, openLocalFiles, saveDoc, saveDocAs, saveProjectAs } from './app/fileActions';
 import { listAutosaves } from './integrations/idb';
 import { completeSignIn } from './integrations/github/auth';
+import { dropModelTextures } from './app/modelActions';
 import { startFileHandling } from './app/launchFiles';
 import { watchInstallability } from './app/installPrompt';
 import { selectAll } from './tools/marquee';
@@ -17,6 +18,7 @@ import { Toolbar } from './ui/Toolbar';
 import { AppMenu, type MenuActions } from './ui/AppMenu';
 import { DocTabs } from './ui/DocTabs';
 import { Workspace } from './ui/Workspace';
+import { ModelWorkspace } from './ui/ModelWorkspace';
 import { StatusBar } from './ui/StatusBar';
 import { OptionsPanel } from './ui/OptionsPanel';
 import { NewDocDialog } from './ui/dialogs/NewDocDialog';
@@ -63,6 +65,7 @@ export function App() {
   const [syncSourceId, setSyncSourceId] = useState<string | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const hasDocs = useDocStore((s) => s.order.length > 0);
+  const activeIsModel = useDocStore((s) => (s.activeId ? s.activeId in s.models : false));
   const loaded = useSettingsStore((s) => s.loaded);
 
   useEffect(() => {
@@ -107,6 +110,13 @@ export function App() {
   }, []);
 
   useEffect(() => watchSystemTheme(() => useSettingsStore.getState().theme), []);
+
+  // The feature-tab strip follows the active document's kind (docs/11 §11).
+  useEffect(() => {
+    const ts = useToolStore.getState();
+    if (activeIsModel && ts.tab !== 'model') ts.setTab('model');
+    if (!activeIsModel && ts.tab === 'model') ts.setTab('brushes');
+  }, [activeIsModel]);
 
   useEffect(
     () =>
@@ -162,15 +172,30 @@ export function App() {
   }, []);
 
   const withActive = useCallback((fn: (docId: string) => void) => {
-    const id = useDocStore.getState().activeId;
-    if (id) fn(id);
+    const st = useDocStore.getState();
+    const id = st.activeId;
+    if (!id) return;
+    if (st.models[id]) {
+      // Model documents have nothing to save yet — writing them back is M19 (docs/11 §13).
+      toast('Saving model edits lands with the modelling milestones.');
+      return;
+    }
+    fn(id);
   }, []);
 
   const requestClose = useCallback((id: string) => {
-    const doc = useDocStore.getState().docs[id];
+    const st = useDocStore.getState();
+    const model = st.models[id];
+    if (model) {
+      // Model geometry edits arrive in M16; until then a model tab is never dirty.
+      dropModelTextures(id);
+      st.closeDoc(id);
+      return;
+    }
+    const doc = st.docs[id];
     if (!doc) return;
     if (doc.dirty) setClosing(id);
-    else useDocStore.getState().closeDoc(id);
+    else st.closeDoc(id);
   }, []);
 
   const notYet = useCallback(
@@ -272,7 +297,22 @@ export function App() {
         <section className="center">
           <DocTabs onNew={() => setDialog('new')} onClose={requestClose} />
           {hasDocs ? (
-            <Workspace />
+            // Both workspaces stay mounted so switching tabs never resets renderer state;
+            // CSS hides the inactive one and its ResizeObserver skips zero-size layouts.
+            <>
+              <div
+                className="workspace-slot"
+                style={{ display: activeIsModel ? 'none' : 'contents' }}
+              >
+                <Workspace />
+              </div>
+              <div
+                className="workspace-slot"
+                style={{ display: activeIsModel ? 'contents' : 'none' }}
+              >
+                <ModelWorkspace />
+              </div>
+            </>
           ) : (
             <div className="empty">
               <p>No document open.</p>

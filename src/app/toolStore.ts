@@ -8,7 +8,7 @@ import { invalidate } from './bus';
 export type ToolId =
   'select' | 'pan' | 'pen' | 'marker' | 'eraser' | 'bucket' | 'eyedropper' | 'shape' | 'text';
 
-export type FeatureTab = 'brushes' | 'shapes' | 'text' | 'noise' | 'recolour' | 'canvas';
+export type FeatureTab = 'brushes' | 'shapes' | 'text' | 'noise' | 'recolour' | 'canvas' | 'model';
 
 export type TipShape = 'circle' | 'square';
 
@@ -82,6 +82,7 @@ export const TAB_TOOL: Record<FeatureTab, ToolId | null> = {
   noise: null,
   recolour: null,
   canvas: null,
+  model: null,
 };
 
 /**

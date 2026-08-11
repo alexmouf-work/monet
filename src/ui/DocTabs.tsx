@@ -4,6 +4,7 @@ import { useDocStore } from '../app/docStore';
 export function DocTabs({ onNew, onClose }: { onNew(): void; onClose(id: string): void }) {
   const order = useDocStore((s) => s.order);
   const docs = useDocStore((s) => s.docs);
+  const models = useDocStore((s) => s.models);
   const activeId = useDocStore((s) => s.activeId);
   const setActive = useDocStore((s) => s.setActive);
   useDocStore((s) => s.rev); // re-render on dirty/name changes
@@ -11,8 +12,9 @@ export function DocTabs({ onNew, onClose }: { onNew(): void; onClose(id: string)
   return (
     <div className="doctabs" role="tablist">
       {order.map((id) => {
-        const doc = docs[id];
+        const doc = docs[id] ?? models[id];
         if (!doc) return null;
+        const isModel = id in models;
         return (
           <div
             key={id}
@@ -28,6 +30,11 @@ export function DocTabs({ onNew, onClose }: { onNew(): void; onClose(id: string)
             title={doc.binding ? doc.binding.path : doc.name}
           >
             {doc.dirty && <span className="doctab__dot" aria-label="unsaved" />}
+            {isModel && (
+              <span className="doctab__kind" title="3D model" aria-hidden>
+                ▣
+              </span>
+            )}
             <span className="doctab__name">{doc.name}</span>
             <button
               className="doctab__close"

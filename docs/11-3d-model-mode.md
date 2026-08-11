@@ -69,7 +69,7 @@ Left-drag cannot orbit here — it paints.
 | `Ctrl`/`Shift` + middle-drag, or `Space`+drag | pan |
 | wheel | dolly (zoom at cursor) |
 | right-drag | orbit (alias, for mice without a usable middle button) |
-| left-drag | the active tool (paint, select, gizmo) |
+| left-drag | the active tool (paint, select, gizmo); **until M15 lands, left-drag orbits** |
 
 This moves middle-drag off "pan", which is a real break with the 2D habit. Mitigation: `Space` is
 pan in both modes, and a **Navigation preference** offers a Blockbench preset. Worth confirming.
@@ -149,6 +149,11 @@ interface CameraState {
   fov: number;                           // perspective only
 }
 ```
+
+**As built (M13, deviation):** model documents live in a `models` map parallel to `docs`,
+sharing `order`/`activeId`, rather than the single `Doc` union above — `active()` returning
+null for a model id lets every existing 2D consumer keep working unchanged. The union stays the
+conceptual model; the maps are the implementation.
 
 **Undo**: unchanged mechanism. Element edits are `Command`s through `docStore.execute`, so 3D
 edits share the 200-step history, the dirty flag and autosave. `docs/ARCHITECTURE.md`'s rule

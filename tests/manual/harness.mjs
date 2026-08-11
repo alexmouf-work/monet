@@ -58,7 +58,13 @@ const browser = await chromium.launch({
   headless: !headed,
   executablePath: process.env.CHROME_PATH || undefined,
   slowMo,
-  args: ['--force-device-scale-factor=1'],
+  args: [
+    '--force-device-scale-factor=1',
+    // WebGL2 for the 3D viewport: this Chromium needs software GL spelled out headless.
+    '--use-gl=angle',
+    '--use-angle=swiftshader',
+    '--enable-unsafe-swiftshader',
+  ],
 });
 const context = await browser.newContext({
   viewport: { width: Number(opt('width', 1280)), height: Number(opt('height', 800)) },
@@ -111,7 +117,8 @@ const state = {
 const ui = {
   page,
   async canvasBox() {
-    return page.locator('.workspace__canvas').boundingBox();
+    // Both workspaces stay mounted since 3D mode; target the 2D one explicitly.
+    return page.locator('.workspace:not(.workspace--model) .workspace__canvas').boundingBox();
   },
   /** Screen point from a fraction of the canvas. */
   async at(fx, fy) {

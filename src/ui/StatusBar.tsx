@@ -5,11 +5,13 @@ import { useViewStore } from '../app/viewStore';
 import { useToolStore } from '../app/toolStore';
 import { zoomPercent, ZOOM_MAX, ZOOM_MIN } from '../engine/viewport';
 import { getCursor, subscribeCursor } from './Workspace';
+import { modelHover, subscribeModelHover } from './ModelWorkspace';
 
 const DEFAULT_VIEW = { zoom: 8, panX: 0, panY: 0 };
 
 export function StatusBar() {
   const doc = useDocStore((s) => (s.activeId ? s.docs[s.activeId] : null));
+  const model = useDocStore((s) => (s.activeId ? s.models[s.activeId] : null));
   useDocStore((s) => s.rev);
   // Selectors must never allocate: a fresh object every call fails zustand's equality
   // check and re-renders forever. Read the stored view, default outside the selector.
@@ -22,7 +24,36 @@ export function StatusBar() {
 
   const [, force] = useState(0);
   useEffect(() => subscribeCursor(() => force((n) => n + 1)), []);
+  useEffect(() => subscribeModelHover(() => force((n) => n + 1)), []);
   const cursor = getCursor();
+
+  if (model) {
+    const h = modelHover();
+    const cam = model.camera;
+    const tex = h ? model.textures[h.textureVar] : null;
+    const texel =
+      h && tex && tex.kind === 'file'
+        ? `${Math.min(tex.width - 1, Math.floor(h.uvNorm.u * tex.width))}, ${Math.min(tex.height - 1, Math.floor(h.uvNorm.v * tex.height))}`
+        : null;
+    return (
+      <footer className="statusbar">
+        <span className="statusbar__cell statusbar__coords">
+          {h ? `#${h.elementId} ${h.face}` : '—'}
+        </span>
+        <span className="statusbar__cell">{texel ? `texel ${texel}` : ''}</span>
+        <span className="statusbar__cell">
+          {model.elements.length} element{model.elements.length === 1 ? '' : 's'}
+        </span>
+        <span className="statusbar__cell statusbar__flags">
+          yaw {Math.round(cam.yaw)}° · pitch {Math.round(cam.pitch)}° ·{' '}
+          {cam.projection === 'orthographic' ? 'ortho' : 'persp'}
+        </span>
+        <span className="statusbar__cell statusbar__save">
+          {model.dirty ? '● unsaved' : '✓ saved'}
+        </span>
+      </footer>
+    );
+  }
 
   return (
     <footer className="statusbar">

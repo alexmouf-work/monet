@@ -6,6 +6,7 @@ import { TextPanel } from './panels/TextPanel';
 import { CanvasPanel } from './panels/CanvasPanel';
 import { NoisePanel } from './panels/NoisePanel';
 import { RecolourPanel } from './panels/RecolourPanel';
+import { ModelPanel } from './panels/ModelPanel';
 import { ColorPanel } from './ColorPanel';
 
 export function OptionsPanel({ onResizeCanvas }: { onResizeCanvas(): void }) {
@@ -19,6 +20,7 @@ export function OptionsPanel({ onResizeCanvas }: { onResizeCanvas(): void }) {
         {tab === 'canvas' && <CanvasPanel onResize={onResizeCanvas} />}
         {tab === 'noise' && <NoisePanel />}
         {tab === 'recolour' && <RecolourPanel />}
+        {tab === 'model' && <ModelPanel />}
       </div>
       <ColorPanel />
     </aside>

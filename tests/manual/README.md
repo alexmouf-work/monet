@@ -49,6 +49,7 @@ up with no build step.
 | `perf.mjs` | frame cost **and** handler cost; also asserts wheel-zoom can cancel page scroll |
 | `eyedropper-shapes-clipboard.mjs` | momentary picking, outline-off edges, object copy/paste |
 | `file-handler.mjs` | an OS "open with" launch: fake `launchQueue` + handles, then Ctrl+S writing back to the launched file |
+| `model3d.mjs` | M13: models from a fixture jar, WebGL2 render probe, Onshape navigation, hover picking, banner |
 | `github-login.mjs` | GitHub App sign-in: authorize URL, exchange, refresh, installations, forged-state refusal — all against a mocked GitHub |
 
 `shot()` deliberately waits two `requestAnimationFrame`s before capturing: a full-page

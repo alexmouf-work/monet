@@ -35,7 +35,9 @@ export default async function ({ ui, shot, state, log, page }) {
   await page.click('.topbar__tools .iconbtn[title^="Select"]');
   await ui.click(await ui.atDoc(10, 20));
   await page.waitForTimeout(200);
-  await page.dblclick('.workspace__canvas', { position: { x: 0, y: 0 } }).catch(() => {});
+  await page
+    .dblclick('.workspace:not(.workspace--model) .workspace__canvas', { position: { x: 0, y: 0 } })
+    .catch(() => {});
   log('re-edit id after dblclick at origin (expect null):', await state.editingTextId());
   await shot('final');
 }

@@ -4,6 +4,7 @@ import { useDocStore } from '../app/docStore';
 import { useViewStore } from '../app/viewStore';
 import { useToolStore, type FeatureTab, type ToolId } from '../app/toolStore';
 import { getTool } from '../tools';
+import { frameModel, snapView, updateCamera } from './ModelWorkspace';
 import { nudgeSelected } from '../tools/selectTool';
 import { anchorSelection } from '../app/selectionActions';
 import { isTypingTarget } from './Workspace';
@@ -27,6 +28,39 @@ export interface ShortcutActions {
   shortcutsHelp(): void;
   addJar(): Promise<void> | void;
   addFolder(): Promise<void> | void;
+}
+
+/** 3D navigation — digits mirror the classic CAD numpad views (docs/11 §12). */
+function handleModelKey(e: KeyboardEvent): boolean {
+  switch (e.code) {
+    case 'Digit1':
+      snapView('front');
+      return true;
+    case 'Digit3':
+      snapView('right');
+      return true;
+    case 'Digit7':
+      snapView('top');
+      return true;
+    case 'Digit9':
+      updateCamera((m) => {
+        m.camera = { ...m.camera, yaw: (m.camera.yaw + 180) % 360 };
+      });
+      return true;
+    case 'Digit5':
+      updateCamera((m) => {
+        m.camera = {
+          ...m.camera,
+          projection: m.camera.projection === 'perspective' ? 'orthographic' : 'perspective',
+        };
+      });
+      return true;
+    case 'Period':
+      frameModel();
+      return true;
+    default:
+      return false;
+  }
 }
 
 const TOOL_KEYS: Record<string, ToolId> = {
@@ -62,6 +96,18 @@ export function useShortcuts(actions: ShortcutActions) {
       if (getTool(ts.active).onKey?.(e)) {
         e.preventDefault();
         return;
+      }
+
+      // Model documents get their own navigation keys (docs/11 §12) and skip the 2D map —
+      // except undo/redo and the file/global chords below, which behave identically.
+      if (ds.activeId && ds.models[ds.activeId] && !mod) {
+        if (handleModelKey(e)) {
+          e.preventDefault();
+          return;
+        }
+        // Swallow the rest of the 2D map: `B` must not switch to a pen that cannot paint
+        // here (yet), and `G` toggles the 2D grid. Esc and ? keep their global meanings.
+        if (e.code !== 'Escape' && e.code !== 'Slash') return;
       }
 
       if (mod) {
@@ -130,7 +176,8 @@ export function useShortcuts(actions: ShortcutActions) {
             return;
           case 'Digit0':
             e.preventDefault();
-            if (doc) vs.fit(doc.id, doc.width, doc.height);
+            if (ds.activeId && ds.models[ds.activeId]) frameModel();
+            else if (doc) vs.fit(doc.id, doc.width, doc.height);
             return;
           case 'Digit1':
             e.preventDefault();

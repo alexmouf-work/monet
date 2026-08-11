@@ -11,6 +11,11 @@ const TABS: { id: FeatureTab; label: string; key: string }[] = [
   { id: 'canvas', label: 'Canvas', key: 'C' },
 ];
 
+/** A model document swaps the tab strip — same chrome, different sections (docs/11 §11). */
+const MODEL_TABS: { id: FeatureTab; label: string; key: string }[] = [
+  { id: 'model', label: 'Model', key: '' },
+];
+
 export function TopBar({
   onMenu,
   onSettings,
@@ -27,6 +32,8 @@ export function TopBar({
   const setTab = useToolStore((s) => s.setTab);
   const setTool = useToolStore((s) => s.setTool);
   const hasDoc = useDocStore((s) => s.activeId !== null);
+  const isModel = useDocStore((s) => (s.activeId ? s.activeId in s.models : false));
+  const tabs = isModel ? MODEL_TABS : TABS;
 
   return (
     <header className="topbar">
@@ -53,14 +60,14 @@ export function TopBar({
       </div>
 
       <nav className="topbar__tabs" role="tablist">
-        {TABS.map((t) => (
+        {tabs.map((t) => (
           <button
             key={t.id}
             role="tab"
             aria-selected={tab === t.id}
             className={`tab ${tab === t.id ? 'is-active' : ''}`}
             onClick={() => setTab(t.id)}
-            title={`${t.label} (${t.key})`}
+            title={t.key ? `${t.label} (${t.key})` : t.label}
           >
             {t.label}
           </button>

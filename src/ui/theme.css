@@ -860,6 +860,116 @@ kbd {
   border-radius: 4px;
 }
 
+/* ---- 3D model mode (docs/11) ---- */
+
+.workspace--model {
+  position: relative;
+}
+
+.doctab__kind {
+  color: var(--accent);
+  font-size: 10px;
+}
+
+/* Onshape-style view cube: CSS 3D, driven by the camera, clickable faces. */
+.viewcube {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 64px;
+  height: 64px;
+  perspective: none;
+  z-index: 3;
+  cursor: grab;
+}
+
+.viewcube:active {
+  cursor: grabbing;
+}
+
+.viewcube__box {
+  position: absolute;
+  inset: 12px;
+  transform-style: preserve-3d;
+}
+
+.viewcube__face {
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font:
+    600 11px system-ui,
+    sans-serif;
+  color: var(--text);
+  background: color-mix(in srgb, var(--panel) 82%, transparent);
+  border: 1px solid var(--border);
+  backface-visibility: hidden;
+  cursor: pointer;
+}
+
+.viewcube__face:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.viewcube__face--front {
+  transform: translateZ(20px);
+}
+.viewcube__face--back {
+  transform: rotateY(180deg) translateZ(20px);
+}
+.viewcube__face--right {
+  transform: rotateY(90deg) translateZ(20px);
+}
+.viewcube__face--left {
+  transform: rotateY(-90deg) translateZ(20px);
+}
+.viewcube__face--top {
+  transform: rotateX(90deg) translateZ(20px);
+}
+.viewcube__face--bottom {
+  transform: rotateX(-90deg) translateZ(20px);
+}
+
+.srctree__thumb--model {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+  font-size: 13px;
+}
+
+.outliner {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  max-height: 180px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel-2);
+}
+
+.outliner__row {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  padding: 4px 8px;
+  font-size: 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 40%, transparent);
+}
+
+.outliner__row:last-child {
+  border-bottom: none;
+}
+
+.outliner__icon {
+  color: var(--text-dim);
+}
+
 /* GitHub account block (Settings + Connect repository). */
 .account {
   display: flex;

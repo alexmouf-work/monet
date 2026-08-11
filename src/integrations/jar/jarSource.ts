@@ -19,6 +19,7 @@ export interface JarMeta {
 
 const ASSET_PNG = /^assets\/[^/]+\/textures\/.+\.png$/i;
 const ANY_PNG = /\.png$/i;
+const MODEL_JSON = /^assets\/[^/]+\/models\/.+\.json$/i;
 
 export const loadJarMetas = async (): Promise<JarMeta[]> =>
   ((await idbGet(META_KEY)) as JarMeta[] | undefined) ?? [];
@@ -89,6 +90,22 @@ class JarSource implements SourceProvider {
     const file = zip.file(String(node.ref ?? node.path));
     if (!file) throw new Error(`${node.path} is not in ${this.label}.`);
     return { png: await file.async('uint8array') };
+  }
+
+  async readPath(path: string): Promise<Uint8Array> {
+    const zip = await this.open();
+    const file = zip.file(path);
+    if (!file) throw new Error(`${path} is not in ${this.label}.`);
+    return file.async('uint8array');
+  }
+
+  async listModels(): Promise<string[]> {
+    const zip = await this.open();
+    const out: string[] = [];
+    zip.forEach((path, entry) => {
+      if (!entry.dir && MODEL_JSON.test(path)) out.push(path);
+    });
+    return out.sort();
   }
 
   dispose(): void {

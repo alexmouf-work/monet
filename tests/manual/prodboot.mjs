@@ -79,7 +79,9 @@ console.log('sw.js:', sw.status, '| registered:', sw.registered, '| scope:', sw.
 await page.click('.empty .btn--primary');
 await page.click('.dialog__actions .btn--primary');
 await page.waitForTimeout(600);
-const box = await page.locator('.workspace__canvas').boundingBox();
+const box = await page
+  .locator('.workspace:not(.workspace--model) .workspace__canvas')
+  .boundingBox();
 await page.mouse.move(box.x + box.width * 0.4, box.y + box.height * 0.4);
 await page.mouse.down();
 await page.mouse.move(box.x + box.width * 0.6, box.y + box.height * 0.6, { steps: 8 });
