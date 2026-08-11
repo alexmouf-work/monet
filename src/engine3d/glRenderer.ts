@@ -21,6 +21,10 @@ export interface ModelScene {
   camera: CameraState;
   textures: Map<string, ModelTexturePixels>;
   hoverKey: number; // faceKey under the cursor, -1 for none
+  selectedElement: number; // element id, -1 for none
+  accent: string; // CSS hex from the theme
+  /** Translate-gizmo origin in model space, or null (docs/11 §10.1 item 4). */
+  gizmo: { x: number; y: number; z: number } | null;
   surround: string; // CSS hex from the theme
   flatShade: boolean;
   grid: boolean;
@@ -38,12 +42,15 @@ void main() {
 const MESH_FS = `#version 300 es
 precision mediump float;
 in vec2 vUV; in float vShade; in float vKey;
-uniform sampler2D uTex; uniform float uHoverKey; uniform bool uFlat;
+uniform sampler2D uTex; uniform float uHoverKey; uniform float uSelectedEl;
+uniform vec3 uAccent; uniform bool uFlat;
 out vec4 o;
 void main() {
   vec4 c = texture(uTex, vUV);
   if (c.a < 0.1) discard;               // Minecraft cutout
   vec3 rgb = c.rgb * (uFlat ? 1.0 : vShade);
+  float el = floor(vKey / 8.0 + 0.001);
+  if (uSelectedEl >= 0.0 && abs(el - uSelectedEl) < 0.5) rgb = mix(rgb, uAccent, 0.25);
   if (uHoverKey >= 0.0 && abs(vKey - uHoverKey) < 0.5) rgb = mix(rgb, vec3(1.0), 0.3);
   o = vec4(rgb, 1.0);
 }`;
@@ -411,6 +418,9 @@ export class ModelRenderer {
     gl.useProgram(this.meshProgram);
     gl.uniformMatrix4fv(gl.getUniformLocation(this.meshProgram, 'uMVP'), false, mvp);
     gl.uniform1f(gl.getUniformLocation(this.meshProgram, 'uHoverKey'), scene.hoverKey);
+    gl.uniform1f(gl.getUniformLocation(this.meshProgram, 'uSelectedEl'), scene.selectedElement);
+    const [ar, ag, ab] = hexToRGB(scene.accent);
+    gl.uniform3f(gl.getUniformLocation(this.meshProgram, 'uAccent'), ar, ag, ab);
     gl.uniform1i(gl.getUniformLocation(this.meshProgram, 'uFlat'), scene.flatShade ? 1 : 0);
     gl.uniform1i(gl.getUniformLocation(this.meshProgram, 'uTex'), 0);
     gl.activeTexture(gl.TEXTURE0);
@@ -425,5 +435,55 @@ export class ModelRenderer {
     }
     gl.bindVertexArray(null);
     gl.disable(gl.CULL_FACE);
+
+    // Translate gizmo: three axis segments through the depth buffer (always visible).
+    if (scene.gizmo) {
+      gl.disable(gl.DEPTH_TEST);
+      gl.useProgram(this.lineProgram);
+      gl.uniformMatrix4fv(gl.getUniformLocation(this.lineProgram, 'uMVP'), false, mvp);
+      const g = scene.gizmo;
+      const buf = gl.createBuffer()!;
+      gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+      const L = GIZMO_LENGTH;
+      gl.bufferData(
+        gl.ARRAY_BUFFER,
+        new Float32Array([
+          g.x,
+          g.y,
+          g.z,
+          g.x + L,
+          g.y,
+          g.z,
+          g.x,
+          g.y,
+          g.z,
+          g.x,
+          g.y + L,
+          g.z,
+          g.x,
+          g.y,
+          g.z,
+          g.x,
+          g.y,
+          g.z + L,
+        ]),
+        gl.STREAM_DRAW,
+      );
+      gl.enableVertexAttribArray(0);
+      gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+      const color = gl.getUniformLocation(this.lineProgram, 'uColor');
+      gl.lineWidth(1);
+      gl.uniform4f(color, 0.92, 0.26, 0.26, 1);
+      gl.drawArrays(gl.LINES, 0, 2);
+      gl.uniform4f(color, 0.3, 0.8, 0.36, 1);
+      gl.drawArrays(gl.LINES, 2, 2);
+      gl.uniform4f(color, 0.3, 0.55, 0.95, 1);
+      gl.drawArrays(gl.LINES, 4, 2);
+      gl.deleteBuffer(buf);
+      gl.enable(gl.DEPTH_TEST);
+    }
   }
 }
+
+/** Model-space length of the gizmo axes — shared with the hit test in ModelWorkspace. */
+export const GIZMO_LENGTH = 7;

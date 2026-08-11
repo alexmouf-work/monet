@@ -2,7 +2,7 @@
  * The 3D workspace — docs/11 §5–§6. Owns the WebGL2 renderer's lifecycle and the
  * Onshape-mapped navigation (D11.2): middle-drag orbits, Ctrl/Shift+middle or Space
  * pans, wheel dollies at the cursor, right-drag is an orbit alias. Left-drag routes to
- * the active tool once painting lands (M15); until then it orbits too.
+ * the active tool — paint strokes, select/gizmo, pan — and orbits otherwise.
  */
 import { useEffect, useRef } from 'react';
 import { useDocStore } from '../app/docStore';
@@ -19,16 +19,21 @@ import {
   modelStrokeActive,
 } from '../tools/modelPaint';
 import { themeColors } from '../engine/themeColors';
-import { ModelRenderer, type ModelScene } from '../engine3d/glRenderer';
+import { GIZMO_LENGTH, ModelRenderer, type ModelScene } from '../engine3d/glRenderer';
 import {
   dolly,
   frame,
   orbit,
   pan,
+  projMatrix,
   screenRay,
   standardView,
+  viewMatrix,
   type StandardView,
 } from '../core/model3d/camera';
+import { multiply, transformPoint } from '../core/model3d/vec';
+import { PatchElementCommand } from '../core/model3d/commands';
+import type { Axis, ModelElement, Vec3 } from '../core/model3d/types';
 import { modelBounds } from '../core/model3d/geometry';
 import { faceKey } from '../core/model3d/geometry';
 import { pickModel } from '../core/model3d/pick';
@@ -85,6 +90,27 @@ export function openLookedAtTexture(wholeSheet = false): void {
   if (model && hit) void openFaceTexture(model, hit, { wholeSheet });
 }
 
+/** Centre of an element's box (pre-rotation) — where its gizmo sits. */
+export function elementCentre(el: ModelElement): Vec3 {
+  return {
+    x: (el.from.x + el.to.x) / 2,
+    y: (el.from.y + el.to.y) / 2,
+    z: (el.from.z + el.to.z) / 2,
+  };
+}
+
+/** Shift an element along one axis by `delta`, from a base snapshot (no drift). */
+function applyAxisDelta(el: ModelElement, base: ModelElement, axis: Axis, delta: number): void {
+  el.from = { ...base.from, [axis]: base.from[axis] + delta };
+  el.to = { ...base.to, [axis]: base.to[axis] + delta };
+  if (base.rotation && el.rotation) {
+    el.rotation = {
+      ...base.rotation,
+      origin: { ...base.rotation.origin, [axis]: base.rotation.origin[axis] + delta },
+    };
+  }
+}
+
 export function snapView(view: StandardView, orthographic = true): void {
   updateCamera((m) => {
     m.camera = standardView(m.camera, view);
@@ -102,7 +128,12 @@ export function ModelWorkspace() {
     const host = hostRef.current!;
 
     const getScene = (): ModelScene => {
-      const model = useDocStore.getState().activeModel();
+      const ds = useDocStore.getState();
+      const model = ds.activeModel();
+      const selected =
+        model && ds.selectedElementId != null
+          ? (model.elements.find((e) => e.id === ds.selectedElementId) ?? null)
+          : null;
       return {
         model,
         camera: model?.camera ?? {
@@ -115,6 +146,9 @@ export function ModelWorkspace() {
         },
         textures: model ? modelTextures(model.id) : new Map(),
         hoverKey: hoverNow() ? faceKey(hoverNow()!.elementId, hoverNow()!.face) : -1,
+        selectedElement: selected?.id ?? -1,
+        accent: themeColors().accent,
+        gizmo: selected ? elementCentre(selected) : null,
         surround: themeColors().surround,
         flatShade: viewPrefs.flatShade,
         grid: viewPrefs.grid,
@@ -134,11 +168,81 @@ export function ModelWorkspace() {
     const offInvalidate = onInvalidate((content) => renderer.invalidate(content));
     const offHover = subscribeModelHover(() => renderer.invalidate(false));
 
-    // --- navigation (D11.2) + tools (docs/11 §8) -------------------------------------
-    type DragMode = 'orbit' | 'pan' | 'paint' | null;
+    // --- navigation (D11.2) + tools (docs/11 §8, §10) --------------------------------
+    type DragMode = 'orbit' | 'pan' | 'paint' | 'gizmo' | null;
     let drag: DragMode = null;
     let last = { x: 0, y: 0 };
     let moved = 0;
+    let gizmoDrag: {
+      axis: Axis;
+      before: ModelElement;
+      startT: number;
+    } | null = null;
+
+    /** Model-space point → canvas px, through the same matrices the renderer uses. */
+    const toScreen = (p: Vec3) => {
+      const model = useDocStore.getState().activeModel();
+      if (!model) return null;
+      const r = canvas.getBoundingClientRect();
+      const mvp = multiply(
+        projMatrix(model.camera, r.width / Math.max(1, r.height)),
+        viewMatrix(model.camera),
+      );
+      const ndc = transformPoint(mvp, p);
+      return { x: ((ndc.x + 1) / 2) * r.width, y: ((1 - ndc.y) / 2) * r.height };
+    };
+
+    const canvasPoint = (e: PointerEvent) => {
+      const r = canvas.getBoundingClientRect();
+      return { x: e.clientX - r.left, y: e.clientY - r.top };
+    };
+
+    /** Parameter of the closest point on axis line (origin, dir) to a pointer ray. */
+    const axisParam = (originV: Vec3, axis: Axis, e: PointerEvent): number => {
+      const ray = rayAt(e);
+      if (!ray) return 0;
+      const u = { x: axis === 'x' ? 1 : 0, y: axis === 'y' ? 1 : 0, z: axis === 'z' ? 1 : 0 };
+      const w0 = {
+        x: originV.x - ray.origin.x,
+        y: originV.y - ray.origin.y,
+        z: originV.z - ray.origin.z,
+      };
+      const b = u.x * ray.dir.x + u.y * ray.dir.y + u.z * ray.dir.z;
+      const d0 = u.x * w0.x + u.y * w0.y + u.z * w0.z;
+      const e0 = ray.dir.x * w0.x + ray.dir.y * w0.y + ray.dir.z * w0.z;
+      const denom = 1 - b * b; // u is unit; ray.dir is unit
+      if (Math.abs(denom) < 1e-6) return 0; // axis parallel to the view ray
+      return (b * e0 - d0) / denom;
+    };
+
+    /** Which gizmo axis (if any) is within grab range of the pointer. */
+    const gizmoAxisAt = (e: PointerEvent): { axis: Axis; origin: Vec3 } | null => {
+      const ds = useDocStore.getState();
+      const model = ds.activeModel();
+      const el = model?.elements.find((x) => x.id === ds.selectedElementId);
+      if (!model || !el || useToolStore.getState().active !== 'select') return null;
+      const origin = elementCentre(el);
+      const o = toScreen(origin);
+      if (!o) return null;
+      const p = canvasPoint(e);
+      for (const axis of ['x', 'y', 'z'] as const) {
+        const tip = toScreen({
+          x: origin.x + (axis === 'x' ? GIZMO_LENGTH : 0),
+          y: origin.y + (axis === 'y' ? GIZMO_LENGTH : 0),
+          z: origin.z + (axis === 'z' ? GIZMO_LENGTH : 0),
+        });
+        if (!tip) continue;
+        // Distance from the pointer to the screen-space segment o→tip.
+        const vx = tip.x - o.x;
+        const vy = tip.y - o.y;
+        const len2 = vx * vx + vy * vy || 1;
+        const t = Math.max(0.15, Math.min(1, ((p.x - o.x) * vx + (p.y - o.y) * vy) / len2));
+        const dx = p.x - (o.x + vx * t);
+        const dy = p.y - (o.y + vy * t);
+        if (dx * dx + dy * dy < 100) return { axis, origin };
+      }
+      return null;
+    };
 
     const rayAt = (e: PointerEvent | WheelEvent) => {
       const model = useDocStore.getState().activeModel();
@@ -167,8 +271,18 @@ export function ModelWorkspace() {
         const model = useDocStore.getState().activeModel();
         const tool = useToolStore.getState().active;
         const hit = hitAt(e);
+        const grab = gizmoAxisAt(e);
         if (spaceRef.current) {
           drag = 'pan';
+        } else if (model && grab) {
+          const ds = useDocStore.getState();
+          const el = model.elements.find((x) => x.id === ds.selectedElementId)!;
+          gizmoDrag = {
+            axis: grab.axis,
+            before: JSON.parse(JSON.stringify(el)),
+            startT: axisParam(grab.origin, grab.axis, e),
+          };
+          drag = 'gizmo';
         } else if (model && hit && (e.altKey || tool === 'eyedropper')) {
           // Alt picks colour with any tool — 2D parity (docs/02 §1). Picking is momentary
           // (owner directive): the previous tool comes straight back.
@@ -182,8 +296,8 @@ export function ModelWorkspace() {
           beginModelStroke(model, hit);
           drag = 'paint';
         } else {
-          // No face under the cursor, or a non-paint tool: left-drag orbits.
-          drag = 'orbit';
+          // Pan tool pans; anything else (no face, select over empty space, …) orbits.
+          drag = tool === 'pan' ? 'pan' : 'orbit';
         }
       }
       if (drag) e.preventDefault();
@@ -196,6 +310,19 @@ export function ModelWorkspace() {
         last = { x: e.clientX, y: e.clientY };
         const model = useDocStore.getState().activeModel();
         if (model) extendModelStroke(model, hitAt(e));
+        return;
+      }
+      if (drag === 'gizmo' && gizmoDrag) {
+        const ds = useDocStore.getState();
+        const model = ds.activeModel();
+        const el = model?.elements.find((x) => x.id === ds.selectedElementId);
+        if (!model || !el) return;
+        const origin = elementCentre(gizmoDrag.before);
+        let delta = axisParam(origin, gizmoDrag.axis, e) - gizmoDrag.startT;
+        // Snapping (docs/11 §10.1): the 1/16 lattice by default, ⇧ for half, Alt for free.
+        if (!e.altKey) delta = Math.round(delta / (e.shiftKey ? 0.5 : 1)) * (e.shiftKey ? 0.5 : 1);
+        applyAxisDelta(el, gizmoDrag.before, gizmoDrag.axis, delta);
+        invalidate(true); // geometry changed → mesh rebuild
         return;
       }
       if (drag) {
@@ -214,10 +341,40 @@ export function ModelWorkspace() {
     };
 
     const endDrag = (e: PointerEvent) => {
+      if (drag === 'gizmo' && gizmoDrag) {
+        const ds = useDocStore.getState();
+        const model = ds.activeModel();
+        const el = model?.elements.find((x) => x.id === ds.selectedElementId);
+        if (model && el) {
+          const after = JSON.parse(JSON.stringify(el)) as ModelElement;
+          // Rewind to `before`, then let the command's do() apply `after` — history and the
+          // live document can never disagree (the 2D stroke pattern).
+          const idx = model.elements.findIndex((x) => x.id === el.id);
+          model.elements[idx] = JSON.parse(JSON.stringify(gizmoDrag.before));
+          if (JSON.stringify(after) !== JSON.stringify(gizmoDrag.before)) {
+            ds.executeModel(new PatchElementCommand('Move element', gizmoDrag.before, after));
+          } else {
+            invalidate(true);
+          }
+        }
+        gizmoDrag = null;
+        drag = null;
+        return;
+      }
       if (drag === 'paint' || modelStrokeActive()) {
         endModelStroke();
         drag = null;
         return;
+      }
+      // Select tool: a left CLICK (no drag) picks the element under the cursor.
+      if (
+        drag === 'orbit' &&
+        e.button === 0 &&
+        moved < 3 &&
+        useToolStore.getState().active === 'select'
+      ) {
+        const hit = hitAt(e);
+        useDocStore.getState().selectElement(hit ? hit.elementId : null);
       }
       // A middle CLICK (no drag) opens the face's texture (docs/11 §9.1); the 3-px slop is
       // what separates it from the start of an orbit.

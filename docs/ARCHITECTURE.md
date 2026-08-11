@@ -6,10 +6,12 @@ numbered spec (`docs/00`–`docs/10`) — do not duplicate it here; describe rea
 
 ## State: v1 complete (2026-08-09, M0–M12), plus owner requests since
 
-Every feature in `docs/00 §3` is implemented and exercised in a real browser. 117 unit tests
+Every feature in `docs/00 §3` is implemented and exercised in a real browser. 160 unit tests
 (`src/core` plus the pure GitHub OAuth helpers); behaviour verified by harness scenarios (below).
 
-**3D model mode**: M13 (viewport), M14 (face→texture + live link) and M15 (painting on the model) are built; M16–M19 remain specified in `docs/11-3d-model-mode.md`.
+**3D model mode**: M13 (viewport), M14 (face→texture + live link), M15 (painting on the model)
+and M16 (modelling: element CRUD, numeric properties, translate gizmo, vanilla validation,
+JSON writer) are built; M17–M19 remain specified in `docs/11-3d-model-mode.md`.
 
 ## Tree
 
@@ -40,6 +42,9 @@ src/core/                              PURE: no DOM, no React, all unit-tested
 
 src/core/model3d/                      PURE 3D: types, vec/mat4, orbit camera, java model
   {types,vec,camera,javaModel,vanillaParents,geometry,pick}.ts    parsing, mesh, ray picking
+  commands.ts                          Add/Remove/PatchElement — snapshot-based, docStore.executeModel
+  edit.ts validate.ts expr.ts          newCube/duplicate/mirror; vanilla legality; field arithmetic
+  javaModelWriter.ts                   vanilla-shaped JSON out (tab indent, #var faces, MC key order)
 
 src/engine3d/glRenderer.ts             raw WebGL2 viewport (D11.1): mesh+line programs,
                                        NEAREST textures, frontFace(CW), context-loss rebuild
@@ -66,7 +71,7 @@ src/app/                               stores + action layer
   fileActions exportActions editActions selectionActions canvasActions
   adjustSession.ts                     shared preview/bake for noise + recolour
   themeMode.ts                         system|light|dark, data-theme stamping
-  modelActions.ts                      open models from sources; per-doc texture pixel store;
+  modelActions.ts                      open/new/save models; per-doc texture pixel store;
                                        face→texture opening (uv-rect selection, region extract)
   modelTextureSync.ts                  the live 2-way link: open image docs ARE their textures
   modelViewState.ts overlayRegistry.ts leaf modules: hover/renderer registry, overlay painters
@@ -86,7 +91,8 @@ src/ui/                                React; no business logic
   App.tsx TopBar Toolbar AppMenu DocTabs Workspace StatusBar OptionsPanel ColorPanel
   GithubAccount.tsx                    sign-in / signed-in block, shared by two dialogs
   ModelWorkspace.tsx                   3D workspace: renderer lifecycle, Onshape navigation,
-                                       hover picking, DOM view cube; panels/ModelPanel.tsx
+                                       hover picking, translate gizmo, DOM view cube;
+                                       panels/ModelPanel.tsx (outliner + numeric properties)
   InstallBanner.tsx                    install offer; its pitch is the file association
   SourcesSidebar TextEditOverlay UpdatePrompt sceneHooks useShortcuts fonts theme.css
   panels/{Brushes,Shapes,Text,Canvas,Noise,Recolour}Panel.tsx
@@ -111,7 +117,9 @@ handler costs) · `eyedropper-shapes-clipboard` (the three 2026-08-09 owner requ
 `github-login` (the App sign-in flow against a mocked GitHub) · `file-handler` (an OS launch,
 with fake handles that record what gets written back) · `model3d` (M13 acceptance against a
 fixture jar with a real parent chain) · `model3d-face` (M14: face→texture triggers, uv-rect
-selection, the live 2-way link, uv guides). Fixture jars are built fresh each run by
+selection, the live 2-way link, uv guides) · `model3d-paint` (M15: brushes on the model, stroke
+segmentation, cross-history undo order) · `model3d-edit` (M16: the stool build — fields,
+duplicate/mirror, gizmo snapping, vanillaMode, JSON save). Fixture jars are built fresh each run by
 `tests/manual/fixtures/jar.mjs` (Node-side zip + hand-rolled PNG encoder) — nothing depends on
 leftover /tmp files. The harness launches Chromium with swiftshader flags so WebGL2 works
 headless.
@@ -276,6 +284,14 @@ submission, not GPU rasterisation.
   which is the model while painting in 3D, and would silently drop the command. Stroke
   segmentation identity is the target DOCUMENT, never the texture variable: a cube's six vars
   usually resolve to one file.
+- With a model active, edits span TWO histories (its geometry, the texture last painted from
+  3D). Every command gets a global `seq` stamp at execute time; Ctrl+Z/Y and the toolbar go
+  through `undoNewest`/`redoNewest`, which compare top-of-stack stamps — preferring either
+  history unconditionally undoes the wrong thing or goes dead when that stack empties.
+- Model geometry mutations go through `executeModel` + `ModelCommand` snapshots (never live
+  references — the commands test proves later edits cannot corrupt history). The gizmo applies
+  its drag live but REWINDS to the grab-time snapshot before committing one PatchElementCommand,
+  the same rewind-then-execute pattern strokes use.
 - The clipboard holds either pixels or an object. When both could apply, the system clipboard
   wins **unless** its bytes are the PNG we last wrote — that is our own object copy returning.
 - The text editing overlay commits on a real outside click, not on blur: the pointer-up that

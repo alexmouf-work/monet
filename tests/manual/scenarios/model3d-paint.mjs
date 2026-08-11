@@ -189,4 +189,39 @@ export default async function ({ page, shot, state, log }) {
   const greenish = await state.countColor('#22B14C', 90);
   log('marker painted green-ish texels:', greenish, greenish > 10 ? '✓' : '✗');
   await shot('6-marker');
+
+  // ---- mixed histories: geometry after paint — undo takes the newest edit first ------
+  const els = () => page.evaluate(() => window.__monet.modelElements().length);
+  await modelTab().click();
+  await page.waitForTimeout(250);
+  const elsBefore = await els();
+  await page.keyboard.press('KeyN'); // add cube: a geometry edit, newer than every stroke
+  await page.waitForTimeout(250);
+  const elsAdded = await els();
+  await page.keyboard.press('Control+z'); // must remove the cube, not the older marker stroke
+  await page.waitForTimeout(250);
+  const elsUndone = await els();
+  await textureTab().click();
+  await page.waitForTimeout(250);
+  const greenStill = await state.countColor('#22B14C', 90);
+  log(`elements ${elsBefore} → ${elsAdded} → ${elsUndone}; green texels still ${greenStill}`);
+  log(
+    elsAdded === elsBefore + 1 && elsUndone === elsBefore && greenStill === greenish
+      ? '✓ Ctrl+Z after a geometry edit undoes the geometry, not the older stroke'
+      : '✗ mixed-history undo order wrong',
+  );
+  // With the cube gone the marker stroke is the newest edit — the next undo reaches it.
+  await modelTab().click();
+  await page.waitForTimeout(250);
+  await page.keyboard.press('Control+z');
+  await page.waitForTimeout(250);
+  await textureTab().click();
+  await page.waitForTimeout(250);
+  const greenGone = await state.countColor('#22B14C', 90);
+  log(
+    greenGone === 0
+      ? '✓ next undo reaches back across histories to the stroke'
+      : `✗ ${greenGone} green texels left`,
+  );
+  await shot('7-mixed-undo');
 }

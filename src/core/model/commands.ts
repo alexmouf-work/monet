@@ -11,6 +11,9 @@ export interface Command {
   undo(doc: MonetDoc): void;
   /** Layer ids touched, or 'all' when the stack itself changed. */
   touched(): number[] | 'all';
+  /** Global edit order, stamped by the store — lets histories that span documents
+   *  (3D geometry vs painted textures) undo newest-first (docs/11 §8.2). */
+  seq?: number;
 }
 
 export const HISTORY_LIMIT = 200;

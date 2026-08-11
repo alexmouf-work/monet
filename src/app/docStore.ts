@@ -9,6 +9,7 @@ import { isRaster } from '../core/model/types';
 import { HISTORY_LIMIT, type Command } from '../core/model/commands';
 import { createDoc } from '../core/model/document';
 import type { Model3D } from '../core/model3d/types';
+import type { ModelCommand } from '../core/model3d/commands';
 import { invalidateDoc, patchLayer } from '../engine/layerCache';
 import { invalidate } from './bus';
 
@@ -32,6 +33,15 @@ interface History {
   redo: Command[];
 }
 
+interface ModelHistory {
+  undo: ModelCommand[];
+  redo: ModelCommand[];
+}
+
+/** Monotonic stamp for every executed command, across ALL histories — the tie-breaker that
+ *  lets a model's geometry history and its painted textures' histories undo newest-first. */
+let editSeq = 0;
+
 interface DocState {
   docs: Record<string, MonetDoc>;
   /**
@@ -45,8 +55,11 @@ interface DocState {
   order: string[];
   activeId: string | null;
   histories: Record<string, History>;
+  modelHistories: Record<string, ModelHistory>;
   selection: SelectionState | null;
   selectedObjectId: number | null;
+  /** The selected 3D element of the active model (docs/11 §10.2). */
+  selectedElementId: number | null;
   rev: number;
 
   active(): MonetDoc | null;
@@ -65,15 +78,24 @@ interface DocState {
   /** Execute against a specific document — the 3D paint path, where the ACTIVE doc is the
    *  model and the stroke's target is a texture document (docs/11 §8). */
   executeOn(docId: string, cmd: Command): void;
+  /** Geometry edits on the active model — same 200-step discipline (docs/11 §10). */
+  executeModel(cmd: ModelCommand): void;
   undo(): void;
   redo(): void;
   undoFor(docId: string): void;
   redoFor(docId: string): void;
+  /**
+   * Undo/redo across the active model's geometry history AND the given painted-texture
+   * history, newest edit first (docs/11 §8.2) — with no model active they equal undo()/redo().
+   */
+  undoNewest(paintedDocId: string | null): void;
+  redoNewest(paintedDocId: string | null): void;
   canUndo(): boolean;
   canRedo(): boolean;
 
   setSelection(s: SelectionState | null): void;
   selectObject(id: number | null): void;
+  selectElement(id: number | null): void;
 }
 
 function applyCaches(doc: MonetDoc, cmd: Command) {
@@ -94,8 +116,10 @@ export const useDocStore = create<DocState>((set, get) => ({
   order: [],
   activeId: null,
   histories: {},
+  modelHistories: {},
   selection: null,
   selectedObjectId: null,
+  selectedElementId: null,
   rev: 0,
 
   active() {
@@ -153,6 +177,8 @@ export const useDocStore = create<DocState>((set, get) => ({
       delete models[id];
       const histories = { ...s.histories };
       delete histories[id];
+      const modelHistories = { ...s.modelHistories };
+      delete modelHistories[id];
       const order = s.order.filter((o) => o !== id);
       const activeId = s.activeId === id ? (order[order.length - 1] ?? null) : s.activeId;
       return {
@@ -160,6 +186,7 @@ export const useDocStore = create<DocState>((set, get) => ({
         models,
         order,
         histories,
+        modelHistories,
         activeId,
         selection: null,
         selectedObjectId: null,
@@ -170,7 +197,7 @@ export const useDocStore = create<DocState>((set, get) => ({
   },
 
   setActive(id) {
-    set({ activeId: id, selection: null, selectedObjectId: null });
+    set({ activeId: id, selection: null, selectedObjectId: null, selectedElementId: null });
     get().bump();
   },
 
@@ -203,9 +230,25 @@ export const useDocStore = create<DocState>((set, get) => ({
     if (doc) get().executeOn(doc.id, cmd);
   },
 
+  executeModel(cmd) {
+    const m = get().activeModel();
+    if (!m) return;
+    cmd.seq = ++editSeq;
+    cmd.do(m);
+    m.dirty = true;
+    const h = get().modelHistories[m.id] ?? { undo: [], redo: [] };
+    const undoStack = [...h.undo, cmd];
+    if (undoStack.length > HISTORY_LIMIT) undoStack.shift();
+    set((s) => ({
+      modelHistories: { ...s.modelHistories, [m.id]: { undo: undoStack, redo: [] } },
+    }));
+    get().bump();
+  },
+
   executeOn(docId, cmd) {
     const doc = get().docs[docId];
     if (!doc) return;
+    cmd.seq = ++editSeq;
     cmd.do(doc);
     doc.dirty = true;
     applyCaches(doc, cmd);
@@ -217,9 +260,48 @@ export const useDocStore = create<DocState>((set, get) => ({
   },
 
   undo() {
+    const m = get().activeModel();
+    if (m) {
+      const h = get().modelHistories[m.id];
+      if (!h?.undo.length) return;
+      const cmd = h.undo[h.undo.length - 1];
+      cmd.undo(m);
+      m.dirty = true;
+      set((s) => ({
+        modelHistories: {
+          ...s.modelHistories,
+          [m.id]: { undo: h.undo.slice(0, -1), redo: [...h.redo, cmd] },
+        },
+      }));
+      get().bump();
+      return;
+    }
     const doc = get().active();
     if (!doc) return;
     get().undoFor(doc.id);
+  },
+
+  undoNewest(paintedDocId) {
+    const s = get();
+    const gid = s.activeId && s.models[s.activeId] ? s.activeId : null;
+    const g = gid ? s.modelHistories[gid] : undefined;
+    const p = paintedDocId ? s.histories[paintedDocId] : undefined;
+    const gSeq = g?.undo.length ? (g.undo[g.undo.length - 1].seq ?? 0) : -1;
+    const pSeq = p?.undo.length ? (p.undo[p.undo.length - 1].seq ?? 0) : -1;
+    if (paintedDocId && pSeq > gSeq) get().undoFor(paintedDocId);
+    else get().undo();
+  },
+
+  redoNewest(paintedDocId) {
+    const s = get();
+    const gid = s.activeId && s.models[s.activeId] ? s.activeId : null;
+    const g = gid ? s.modelHistories[gid] : undefined;
+    const p = paintedDocId ? s.histories[paintedDocId] : undefined;
+    const gSeq = g?.redo.length ? (g.redo[g.redo.length - 1].seq ?? 0) : Infinity;
+    const pSeq = p?.redo.length ? (p.redo[p.redo.length - 1].seq ?? 0) : Infinity;
+    // Redo replays commit order — the smaller sequence number goes back on first.
+    if (paintedDocId && pSeq < gSeq) get().redoFor(paintedDocId);
+    else get().redo();
   },
 
   undoFor(docId) {
@@ -242,6 +324,22 @@ export const useDocStore = create<DocState>((set, get) => ({
   },
 
   redo() {
+    const m = get().activeModel();
+    if (m) {
+      const h = get().modelHistories[m.id];
+      if (!h?.redo.length) return;
+      const cmd = h.redo[h.redo.length - 1];
+      cmd.do(m);
+      m.dirty = true;
+      set((s) => ({
+        modelHistories: {
+          ...s.modelHistories,
+          [m.id]: { undo: [...h.undo, cmd], redo: h.redo.slice(0, -1) },
+        },
+      }));
+      get().bump();
+      return;
+    }
     const doc = get().active();
     if (!doc) return;
     get().redoFor(doc.id);
@@ -268,12 +366,21 @@ export const useDocStore = create<DocState>((set, get) => ({
 
   canUndo() {
     const id = get().activeId;
-    return !!id && (get().histories[id]?.undo.length ?? 0) > 0;
+    if (!id) return false;
+    if (get().models[id]) return (get().modelHistories[id]?.undo.length ?? 0) > 0;
+    return (get().histories[id]?.undo.length ?? 0) > 0;
   },
 
   canRedo() {
     const id = get().activeId;
-    return !!id && (get().histories[id]?.redo.length ?? 0) > 0;
+    if (!id) return false;
+    if (get().models[id]) return (get().modelHistories[id]?.redo.length ?? 0) > 0;
+    return (get().histories[id]?.redo.length ?? 0) > 0;
+  },
+
+  selectElement(id) {
+    set({ selectedElementId: id });
+    get().bump(false);
   },
 
   setSelection(s) {

@@ -13,6 +13,8 @@ import { useSettingsStore } from './settingsStore';
 import { compositePixels } from '../engine/compose';
 import { activeRenderer } from '../engine/renderer';
 import { modelHover, modelRenderer } from './modelViewState';
+import { projMatrix, viewMatrix } from '../core/model3d/camera';
+import { multiply, transformPoint } from '../core/model3d/vec';
 import { getComposeOpts } from '../ui/sceneHooks';
 import { editingTextId } from '../tools/textTool';
 
@@ -29,6 +31,10 @@ export interface MonetDebug {
   resetPerf(): void;
   /** Active 3D model document state, camera and hover — null when a 2D doc is focused. */
   model(): unknown;
+  /** The active model's elements (id, from, to) — the harness aims gizmo drags with this. */
+  modelElements(): { id: number; from: number[]; to: number[] }[];
+  /** Model-space point → canvas CSS px through the live camera, or null. */
+  modelToScreen(x: number, y: number, z: number): { x: number; y: number } | null;
   /** Centre pixel of the 3D framebuffer — the "did anything render" probe. */
   modelCenterPixel(): number[] | null;
 }
@@ -165,6 +171,25 @@ export function installDebugBridge(): void {
     modelCenterPixel() {
       const r = modelRenderer();
       return r ? [...r.readCenter()] : null;
+    },
+    modelElements() {
+      const m = useDocStore.getState().activeModel();
+      return (m?.elements ?? []).map((e) => ({
+        id: e.id,
+        from: [e.from.x, e.from.y, e.from.z],
+        to: [e.to.x, e.to.y, e.to.z],
+      }));
+    },
+    modelToScreen(x, y, z) {
+      const m = useDocStore.getState().activeModel();
+      const r = modelRenderer();
+      if (!m || !r) return null;
+      const mvp = multiply(
+        projMatrix(m.camera, r.cssW / Math.max(1, r.cssH)),
+        viewMatrix(m.camera),
+      );
+      const ndc = transformPoint(mvp, { x, y, z });
+      return { x: ((ndc.x + 1) / 2) * r.cssW, y: ((1 - ndc.y) / 2) * r.cssH };
     },
     pixelAt(x, y) {
       const d = useDocStore.getState().active();

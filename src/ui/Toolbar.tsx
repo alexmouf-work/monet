@@ -8,6 +8,7 @@ import { useViewStore } from '../app/viewStore';
 import { useSettingsStore } from '../app/settingsStore';
 import { transformCanvas } from '../app/canvasActions';
 import { copySelection, cutSelection, pasteClipboard } from '../app/selectionActions';
+import { lastPaintedDoc } from '../tools/modelPaint';
 import type { MenuActions } from './AppMenu';
 import { THEME_ICON, THEME_LABEL, nextThemeMode } from '../app/themeMode';
 
@@ -29,12 +30,26 @@ export function Toolbar({ actions }: { actions: MenuActions }) {
   const hasDoc = useDocStore((s) => s.activeId !== null);
   const hasSelection = useDocStore((s) => s.selection !== null);
   const hasObject = useDocStore((s) => s.selectedObjectId !== null);
-  const undoDepth = useDocStore((s) =>
-    s.activeId ? (s.histories[s.activeId]?.undo.length ?? 0) : 0,
-  );
-  const redoDepth = useDocStore((s) =>
-    s.activeId ? (s.histories[s.activeId]?.redo.length ?? 0) : 0,
-  );
+  // For a model, undo spans two histories: its geometry plus the texture last painted
+  // from 3D — the same pair Ctrl+Z walks newest-first via undoNewest (docs/11 §8.2).
+  const undoDepth = useDocStore((s) => {
+    if (!s.activeId) return 0;
+    if (!s.models[s.activeId]) return s.histories[s.activeId]?.undo.length ?? 0;
+    const painted = lastPaintedDoc();
+    return (
+      (s.modelHistories[s.activeId]?.undo.length ?? 0) +
+      (painted ? (s.histories[painted]?.undo.length ?? 0) : 0)
+    );
+  });
+  const redoDepth = useDocStore((s) => {
+    if (!s.activeId) return 0;
+    if (!s.models[s.activeId]) return s.histories[s.activeId]?.redo.length ?? 0;
+    const painted = lastPaintedDoc();
+    return (
+      (s.modelHistories[s.activeId]?.redo.length ?? 0) +
+      (painted ? (s.histories[painted]?.redo.length ?? 0) : 0)
+    );
+  });
   const grid = useViewStore((s) => s.grid);
   const tiling = useViewStore((s) => s.tiling);
   const theme = useSettingsStore((s) => s.theme);
@@ -62,13 +77,19 @@ export function Toolbar({ actions }: { actions: MenuActions }) {
         {
           icon: '↶',
           title: 'Undo (Ctrl+Z)',
-          run: () => useDocStore.getState().undo(),
+          run: () => {
+            const ds = useDocStore.getState();
+            ds.undoNewest(ds.activeId && ds.models[ds.activeId] ? lastPaintedDoc() : null);
+          },
           disabled: !undoDepth,
         },
         {
           icon: '↷',
           title: 'Redo (Ctrl+Y)',
-          run: () => useDocStore.getState().redo(),
+          run: () => {
+            const ds = useDocStore.getState();
+            ds.redoNewest(ds.activeId && ds.models[ds.activeId] ? lastPaintedDoc() : null);
+          },
           disabled: !redoDepth,
         },
       ],

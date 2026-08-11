@@ -970,6 +970,43 @@ kbd {
   color: var(--text-dim);
 }
 
+.numfield {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.numfield span {
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.outliner__row--btn {
+  width: 100%;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+}
+
+.outliner__row--btn:hover {
+  background: var(--accent-soft);
+}
+
+.outliner__row--btn.is-active {
+  background: var(--accent-soft);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.outliner__warn {
+  margin-left: auto;
+  color: var(--danger);
+}
+
+.panel__hint--warn {
+  color: var(--danger);
+}
+
 /* GitHub account block (Settings + Connect repository). */
 .account {
   display: flex;

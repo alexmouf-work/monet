@@ -6,6 +6,7 @@ import { useToolStore, type FeatureTab, type ToolId } from '../app/toolStore';
 import { getTool } from '../tools';
 import { frameModel, openLookedAtTexture, snapView, updateCamera } from './ModelWorkspace';
 import { lastPaintedDoc } from '../tools/modelPaint';
+import { addCube, deleteSelectedElement, duplicateSelectedElement } from './panels/ModelPanel';
 import { nudgeSelected } from '../tools/selectTool';
 import { anchorSelection } from '../app/selectionActions';
 import { isTypingTarget } from './Workspace';
@@ -63,6 +64,13 @@ function handleModelKey(e: KeyboardEvent): boolean {
     case 'Period':
       frameModel();
       return true;
+    case 'KeyN':
+      addCube();
+      return true;
+    case 'Delete':
+    case 'Backspace':
+      deleteSelectedElement();
+      return true;
     // The brushes work on the model (docs/11 §12), so their keys do too.
     case 'KeyB':
       useToolStore.getState().setTool('pen');
@@ -78,6 +86,14 @@ function handleModelKey(e: KeyboardEvent): boolean {
       return true;
     case 'KeyI':
       useToolStore.getState().pushTransient('eyedropper');
+      return true;
+    // Select drives click-select and the gizmo (docs/11 §10.1); the topbar button
+    // advertises "S", so the key must work on models too. Same for pan's "H".
+    case 'KeyS':
+      useToolStore.getState().setTool('select');
+      return true;
+    case 'KeyH':
+      useToolStore.getState().setTool('pan');
       return true;
     case 'BracketLeft':
       useToolStore.getState().nudgeSize(-1);
@@ -132,8 +148,8 @@ export function useShortcuts(actions: ShortcutActions) {
           e.preventDefault();
           return;
         }
-        // Swallow the rest of the 2D map: `B` must not switch to a pen that cannot paint
-        // here (yet), and `G` toggles the 2D grid. Esc and ? keep their global meanings.
+        // Swallow the rest of the 2D map: `U`/`T`/… open 2D-only tabs and `G` toggles the
+        // 2D grid. Esc and ? keep their global meanings.
         if (e.code !== 'Escape' && e.code !== 'Slash') return;
       }
 
@@ -150,21 +166,16 @@ export function useShortcuts(actions: ShortcutActions) {
         switch (e.code) {
           case 'KeyZ': {
             e.preventDefault();
-            // With a model focused, undo targets the texture last painted from 3D — the
-            // stroke landed in that document's history (docs/11 §8.2).
-            const modelTarget = ds.activeId && ds.models[ds.activeId] ? lastPaintedDoc() : null;
-            if (e.shiftKey) {
-              if (modelTarget) ds.redoFor(modelTarget);
-              else ds.redo();
-            } else if (modelTarget) ds.undoFor(modelTarget);
-            else ds.undo();
+            // With a model focused, edits live in TWO histories — the model's geometry and
+            // the texture last painted from 3D (docs/11 §8.2). Take the newest edit first.
+            const painted = ds.activeId && ds.models[ds.activeId] ? lastPaintedDoc() : null;
+            if (e.shiftKey) ds.redoNewest(painted);
+            else ds.undoNewest(painted);
             return;
           }
           case 'KeyY': {
             e.preventDefault();
-            const modelTarget = ds.activeId && ds.models[ds.activeId] ? lastPaintedDoc() : null;
-            if (modelTarget) ds.redoFor(modelTarget);
-            else ds.redo();
+            ds.redoNewest(ds.activeId && ds.models[ds.activeId] ? lastPaintedDoc() : null);
             return;
           }
           case 'KeyS':
@@ -208,7 +219,8 @@ export function useShortcuts(actions: ShortcutActions) {
             return;
           case 'KeyD':
             e.preventDefault();
-            actions.duplicate();
+            if (ds.activeId && ds.models[ds.activeId]) duplicateSelectedElement();
+            else actions.duplicate();
             return;
           case 'KeyF':
             if (e.shiftKey) {

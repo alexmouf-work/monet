@@ -5,6 +5,7 @@ import { useViewStore } from '../app/viewStore';
 
 export interface MenuActions {
   newDoc(): void;
+  newModel(): void;
   open(): void;
   save(): void;
   saveAs(): void;
@@ -59,6 +60,7 @@ export function AppMenu({ actions, onClose }: { actions: MenuActions; onClose():
       title: 'File',
       rows: [
         { label: 'New', keys: 'Ctrl+N', run: actions.newDoc },
+        { label: 'New model (3D)', run: actions.newModel },
         { label: 'Open…', keys: 'Ctrl+O', run: actions.open },
         { label: 'Save', keys: 'Ctrl+S', run: actions.save, disabled: !hasDoc },
         { label: 'Save As…', keys: 'Ctrl+Shift+S', run: actions.saveAs, disabled: !hasDoc },

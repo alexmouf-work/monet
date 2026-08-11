@@ -7,7 +7,7 @@ import { autosaveNow, startAutosave } from './app/autosave';
 import { openFile, openLocalFiles, saveDoc, saveDocAs, saveProjectAs } from './app/fileActions';
 import { listAutosaves } from './integrations/idb';
 import { completeSignIn } from './integrations/github/auth';
-import { dropModelTextures } from './app/modelActions';
+import { dropModelTextures, newModelDoc, saveModelDoc } from './app/modelActions';
 import { startModelTextureSync } from './app/modelTextureSync';
 import { installUVGuides } from './ui/uvGuides';
 import { startFileHandling } from './app/launchFiles';
@@ -116,12 +116,14 @@ export function App() {
 
   useEffect(() => watchSystemTheme(() => useSettingsStore.getState().theme), []);
 
-  // The feature-tab strip follows the active document's kind (docs/11 §11). Brushes is
-  // legal in both modes — the same tools paint on the model.
+  // The feature-tab strip follows the active document's kind (docs/11 §11). Switching TO a
+  // model always lands on the Model tab (the effect fires only on the transition, so Brushes
+  // stays reachable afterwards — the same tools paint on the model); switching back to an
+  // image leaves the 3D-only tab.
   useEffect(() => {
     const ts = useToolStore.getState();
-    if (activeIsModel && ts.tab !== 'model' && ts.tab !== 'brushes') ts.setTab('model');
-    if (!activeIsModel && ts.tab === 'model') ts.setTab('brushes');
+    if (activeIsModel) ts.setTab('model');
+    else if (ts.tab === 'model') ts.setTab('brushes');
   }, [activeIsModel]);
 
   useEffect(
@@ -181,9 +183,10 @@ export function App() {
     const st = useDocStore.getState();
     const id = st.activeId;
     if (!id) return;
-    if (st.models[id]) {
-      // Model documents have nothing to save yet — writing them back is M19 (docs/11 §13).
-      toast('Saving model edits lands with the modelling milestones.');
+    const model = st.models[id];
+    if (model) {
+      // Model save = vanilla JSON download until writable-source model writing lands (M19).
+      void saveModelDoc(model);
       return;
     }
     fn(id);
@@ -212,6 +215,7 @@ export function App() {
   const actions: ShortcutActions & MenuActions = useMemo(
     () => ({
       newDoc: () => setDialog('new'),
+      newModel: () => newModelDoc(),
       open: () => void openLocalFiles(),
       save: () => withActive((id) => void saveDoc(useDocStore.getState().docs[id])),
       // With writable sources connected, Save As offers them; otherwise go straight to a file.

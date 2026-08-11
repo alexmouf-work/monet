@@ -185,6 +185,60 @@ function boundsOf(resolved: { elements: Model3D['elements'] }) {
   return [b.min, b.max] as const;
 }
 
+/** A fresh from-scratch model document: one starter cube, no textures yet (docs/11 §16 M16). */
+export function newModelDoc(): void {
+  const ds = useDocStore.getState();
+  const id = newModelId();
+  const cube = {
+    id: 1,
+    name: 'cube 1',
+    groupId: null,
+    from: { x: 4, y: 0, z: 4 },
+    to: { x: 12, y: 8, z: 12 },
+    faces: Object.fromEntries(
+      ['north', 'south', 'east', 'west', 'up', 'down'].map((f) => [
+        f,
+        { uv: [0, 0, 16, 16] as [number, number, number, number], texture: 'all' },
+      ]),
+    ),
+    visible: true,
+    locked: false,
+  } as Model3D['elements'][number];
+  const doc: Model3D = {
+    kind: 'model',
+    id,
+    name: 'untitled model',
+    dirty: false,
+    format: 'java_block',
+    unit: 16,
+    elements: [cube],
+    groups: [],
+    textures: { all: { kind: 'unresolved', ref: '#all' } },
+    missing: [],
+    camera: frame(DEFAULT_CAMERA, { x: 0, y: 0, z: 0 }, { x: 16, y: 16, z: 16 }),
+    vanillaMode: true,
+    nextItemId: 2,
+  };
+  ds.addModel(doc);
+}
+
+/**
+ * Save a model document — the M16 subset of docs/11 §13: vanilla JSON via download. Jar
+ * sources are read-only, so until repo/folder model writing lands (M19) every model save is
+ * a download; the file loads in Minecraft unmodified.
+ */
+export async function saveModelDoc(model: Model3D): Promise<void> {
+  const { writeJavaModel } = await import('../core/model3d/javaModelWriter');
+  const { downloadBlob } = await import('../integrations/fsa/localFile');
+  const json = writeJavaModel(model);
+  downloadBlob(
+    new Blob([json], { type: 'application/json' }),
+    `${model.name.replace(/\s+/g, '_')}.json`,
+  );
+  useDocStore.getState().markSaved(model.id);
+  toast(`Saved ${model.name}.json`, 'ok');
+}
+
 // ------------------------------------------------------------------ face → texture (docs/11 §9)
 
 /** The face's uv rect in TEXTURE PIXELS, normalized so inverted uvs still give w,h > 0. */

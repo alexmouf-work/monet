@@ -466,6 +466,13 @@ disabled — they reappear the moment a texture document is focused, which is on
 
 `G` is currently unbound in 2D; `N` and `Enter` are free. Nothing in the 2D map changes.
 
+**As built (M16, deviation):** there is one gizmo — translate, per-axis arrows on the selected
+element, active on the **select tool** — so the gizmo-mode keys are not bound. `S`/`H` instead
+switch to select/pan, exactly as the topbar buttons advertise (2D parity). Axis constraint is
+grabbing that axis's arrow; `Alt`/`Shift` snapping works as specified. Rotate and scale are the
+numeric fields (angle/axis/pivot, from/to) per §10.1's numeric-first rule; gizmo modes, `X Y Z`
+constraints and `Tab` depth cycling move to M18 with the rest of the interaction layer.
+
 ---
 
 ## 13. Saving, exporting, validating
@@ -476,6 +483,10 @@ disabled — they reappear the moment a texture document is focused, which is on
 write, or Save-As — in the format it was read as, **preserving unknown keys** so a mod's custom
 fields survive an edit. Vanilla JSON is written in Minecraft's own key order and 0–16 numbers,
 formatted so a diff against the original stays readable.
+
+**As built (M16, interim):** `Ctrl+S` downloads the model as vanilla JSON (tab-indented, MC key
+order, `#var` faces) — jar sources are read-only anyway, and binding write-back with
+unknown-key preservation is M19's writer work.
 
 ### 13.2 Vanilla legality (the `vanillaMode` flag)
 
@@ -566,6 +577,14 @@ axis constraint, snapping and live numeric readout; groups, pivots, outliner; va
 (§13.2).
 **Accept:** build a four-legged stool from scratch, save it as vanilla JSON, and load it in
 Minecraft unmodified; every illegal rotation is refused in `vanillaMode` and flagged outside it.
+
+**As built:** gizmo is translate-only (see §12 note); rotate/scale are numeric fields. Pivot
+edits via the numeric Pivot row. The outliner is a flat selectable element list — group nesting
+UI rides with M18's selection hierarchy. Save is a vanilla-JSON download until M19's writers
+land (§13.1 note). Acceptance verified by `tests/manual/scenarios/model3d-edit.mjs`: the stool
+is built through the real UI (fields with arithmetic, `N`, `Ctrl+D`, mirror buttons), gizmo-
+dragged with lattice snapping, one undo step per drag, 30° snaps to 22.5° in `vanillaMode` and
+flags outside it, and the download parses back to the same five elements.
 
 ### M17 — UV editing
 Per-face UV rects with numeric fields; box-UV auto-map; face rotation/mirror; fit-to-face;
