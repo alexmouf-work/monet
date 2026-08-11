@@ -14,6 +14,7 @@ const TABS: { id: FeatureTab; label: string; key: string }[] = [
 /** A model document swaps the tab strip — same chrome, different sections (docs/11 §11). */
 const MODEL_TABS: { id: FeatureTab; label: string; key: string }[] = [
   { id: 'model', label: 'Model', key: '' },
+  { id: 'brushes', label: 'Brushes', key: 'B' },
 ];
 
 export function TopBar({

@@ -116,10 +116,11 @@ export function App() {
 
   useEffect(() => watchSystemTheme(() => useSettingsStore.getState().theme), []);
 
-  // The feature-tab strip follows the active document's kind (docs/11 §11).
+  // The feature-tab strip follows the active document's kind (docs/11 §11). Brushes is
+  // legal in both modes — the same tools paint on the model.
   useEffect(() => {
     const ts = useToolStore.getState();
-    if (activeIsModel && ts.tab !== 'model') ts.setTab('model');
+    if (activeIsModel && ts.tab !== 'model' && ts.tab !== 'brushes') ts.setTab('model');
     if (!activeIsModel && ts.tab === 'model') ts.setTab('brushes');
   }, [activeIsModel]);
 

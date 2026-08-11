@@ -5,6 +5,7 @@ import { useViewStore } from '../app/viewStore';
 import { useToolStore, type FeatureTab, type ToolId } from '../app/toolStore';
 import { getTool } from '../tools';
 import { frameModel, openLookedAtTexture, snapView, updateCamera } from './ModelWorkspace';
+import { lastPaintedDoc } from '../tools/modelPaint';
 import { nudgeSelected } from '../tools/selectTool';
 import { anchorSelection } from '../app/selectionActions';
 import { isTypingTarget } from './Workspace';
@@ -61,6 +62,28 @@ function handleModelKey(e: KeyboardEvent): boolean {
       return true;
     case 'Period':
       frameModel();
+      return true;
+    // The brushes work on the model (docs/11 §12), so their keys do too.
+    case 'KeyB':
+      useToolStore.getState().setTool('pen');
+      return true;
+    case 'KeyM':
+      useToolStore.getState().setTool('marker');
+      return true;
+    case 'KeyE':
+      useToolStore.getState().setTool('eraser');
+      return true;
+    case 'KeyF':
+      useToolStore.getState().setTool('bucket');
+      return true;
+    case 'KeyI':
+      useToolStore.getState().pushTransient('eyedropper');
+      return true;
+    case 'BracketLeft':
+      useToolStore.getState().nudgeSize(-1);
+      return true;
+    case 'BracketRight':
+      useToolStore.getState().nudgeSize(1);
       return true;
     default:
       return false;
@@ -125,15 +148,25 @@ export function useShortcuts(actions: ShortcutActions) {
           return;
         }
         switch (e.code) {
-          case 'KeyZ':
+          case 'KeyZ': {
             e.preventDefault();
-            if (e.shiftKey) ds.redo();
+            // With a model focused, undo targets the texture last painted from 3D — the
+            // stroke landed in that document's history (docs/11 §8.2).
+            const modelTarget = ds.activeId && ds.models[ds.activeId] ? lastPaintedDoc() : null;
+            if (e.shiftKey) {
+              if (modelTarget) ds.redoFor(modelTarget);
+              else ds.redo();
+            } else if (modelTarget) ds.undoFor(modelTarget);
             else ds.undo();
             return;
-          case 'KeyY':
+          }
+          case 'KeyY': {
             e.preventDefault();
-            ds.redo();
+            const modelTarget = ds.activeId && ds.models[ds.activeId] ? lastPaintedDoc() : null;
+            if (modelTarget) ds.redoFor(modelTarget);
+            else ds.redo();
             return;
+          }
           case 'KeyS':
             e.preventDefault();
             if (e.shiftKey) actions.saveAs();

@@ -6,8 +6,18 @@
  */
 import { useEffect, useRef } from 'react';
 import { useDocStore } from '../app/docStore';
+import { useToolStore } from '../app/toolStore';
 import { onInvalidate, invalidate } from '../app/bus';
 import { modelTextures, openFaceTexture } from '../app/modelActions';
+import {
+  beginModelStroke,
+  endModelStroke,
+  extendModelStroke,
+  isPaintTool,
+  modelBucketAt,
+  modelEyedropperAt,
+  modelStrokeActive,
+} from '../tools/modelPaint';
 import { themeColors } from '../engine/themeColors';
 import { ModelRenderer, type ModelScene } from '../engine3d/glRenderer';
 import {
@@ -124,8 +134,8 @@ export function ModelWorkspace() {
     const offInvalidate = onInvalidate((content) => renderer.invalidate(content));
     const offHover = subscribeModelHover(() => renderer.invalidate(false));
 
-    // --- navigation (D11.2) ---------------------------------------------------------
-    type DragMode = 'orbit' | 'pan' | null;
+    // --- navigation (D11.2) + tools (docs/11 §8) -------------------------------------
+    type DragMode = 'orbit' | 'pan' | 'paint' | null;
     let drag: DragMode = null;
     let last = { x: 0, y: 0 };
     let moved = 0;
@@ -139,19 +149,55 @@ export function ModelWorkspace() {
       return screenRay(model.camera, r.width / Math.max(1, r.height), ndcX, ndcY);
     };
 
+    const hitAt = (e: PointerEvent) => {
+      const model = useDocStore.getState().activeModel();
+      const ray = rayAt(e);
+      return model && ray ? pickModel(model.elements, ray) : null;
+    };
+
     const onPointerDown = (e: PointerEvent) => {
       canvas.setPointerCapture(e.pointerId);
       last = { x: e.clientX, y: e.clientY };
       moved = 0;
-      if (e.button === 1) drag = e.ctrlKey || e.shiftKey ? 'pan' : 'orbit';
-      else if (e.button === 2) drag = 'orbit';
-      else if (e.button === 0) drag = spaceRef.current ? 'pan' : 'orbit'; // tools take left in M15
+      if (e.button === 1) {
+        drag = e.ctrlKey || e.shiftKey ? 'pan' : 'orbit';
+      } else if (e.button === 2) {
+        drag = 'orbit';
+      } else if (e.button === 0) {
+        const model = useDocStore.getState().activeModel();
+        const tool = useToolStore.getState().active;
+        const hit = hitAt(e);
+        if (spaceRef.current) {
+          drag = 'pan';
+        } else if (model && hit && (e.altKey || tool === 'eyedropper')) {
+          // Alt picks colour with any tool — 2D parity (docs/02 §1). Picking is momentary
+          // (owner directive): the previous tool comes straight back.
+          modelEyedropperAt(model, hit);
+          if (tool === 'eyedropper') useToolStore.getState().popTransient();
+          drag = null;
+        } else if (model && hit && tool === 'bucket') {
+          modelBucketAt(model, hit);
+          drag = null;
+        } else if (model && hit && isPaintTool(tool)) {
+          beginModelStroke(model, hit);
+          drag = 'paint';
+        } else {
+          // No face under the cursor, or a non-paint tool: left-drag orbits.
+          drag = 'orbit';
+        }
+      }
       if (drag) e.preventDefault();
     };
 
     const onPointerMove = (e: PointerEvent) => {
       const dx = e.clientX - last.x;
       const dy = e.clientY - last.y;
+      if (drag === 'paint') {
+        last = { x: e.clientX, y: e.clientY };
+        const model = useDocStore.getState().activeModel();
+        if (model) extendModelStroke(model, hitAt(e));
+        return;
+      }
       if (drag) {
         last = { x: e.clientX, y: e.clientY };
         moved += Math.abs(dx) + Math.abs(dy);
@@ -168,6 +214,11 @@ export function ModelWorkspace() {
     };
 
     const endDrag = (e: PointerEvent) => {
+      if (drag === 'paint' || modelStrokeActive()) {
+        endModelStroke();
+        drag = null;
+        return;
+      }
       // A middle CLICK (no drag) opens the face's texture (docs/11 §9.1); the 3-px slop is
       // what separates it from the start of an orbit.
       const wasMiddleClick = drag === 'orbit' && e.button === 1 && moved < 3;
@@ -237,9 +288,14 @@ export function ModelWorkspace() {
     };
   }, []);
 
+  const activeTool = useToolStore((s) => s.active);
   return (
     <div className="workspace workspace--model" ref={hostRef}>
-      <canvas ref={canvasRef} className="workspace__canvas" style={{ cursor: 'default' }} />
+      <canvas
+        ref={canvasRef}
+        className="workspace__canvas"
+        style={{ cursor: isPaintTool(activeTool) ? 'crosshair' : 'default' }}
+      />
       <ViewCube />
     </div>
   );

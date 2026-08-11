@@ -3,7 +3,7 @@
  * buffer with `max` (so one stroke never darkens where it overlaps itself) and composites
  * once on pointer-up as a single undoable command.
  */
-import type { Rect } from '../core/model/types';
+import type { MonetDoc, Rect } from '../core/model/types';
 import { isRaster } from '../core/model/types';
 import { hexToRgb } from '../core/color/convert';
 import { StrokeCommand } from '../core/model/commands';
@@ -65,9 +65,12 @@ export function beginStroke(opts: {
   shape: TipShape;
   graded: boolean;
   at: { x: number; y: number };
+  /** Paint into this document instead of the active one — the 3D path (docs/11 §8), where
+   *  the ACTIVE document is the model and the target is the face's texture document. */
+  doc?: MonetDoc;
 }): void {
   anchorIfFloating();
-  const doc = useDocStore.getState().active();
+  const doc = opts.doc ?? useDocStore.getState().active();
   if (!doc) return;
   const { color, alpha } = useToolStore.getState();
   live = {
@@ -224,11 +227,24 @@ export function endStroke(label: string): void {
   );
   // The pixels are already mutated, so replay the command's `before` and let execute() redo it.
   cmd.undo(doc);
-  ds.execute(cmd);
+  ds.executeOn(doc.id, cmd);
   useToolStore.getState().commitRecent();
 }
 
 export const strokeActive = () => live !== null;
+
+/** The document the live stroke is painting into, or null. */
+export const strokeDocId = () => live?.docId ?? null;
+
+/**
+ * Forget the last stamp point WITHOUT ending the stroke: the next stamp starts a fresh
+ * segment instead of interpolating. This is how a 3D drag crosses a UV discontinuity —
+ * interpolating across one would draw a line through unrelated texels (docs/11 §8.1) —
+ * while still committing as ONE undo step on pointer-up.
+ */
+export function breakStroke(): void {
+  if (live) live.last = null;
+}
 
 export function cancelStroke(): void {
   if (!live) return;

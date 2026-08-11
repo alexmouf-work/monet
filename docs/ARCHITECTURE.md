@@ -9,7 +9,7 @@ numbered spec (`docs/00`–`docs/10`) — do not duplicate it here; describe rea
 Every feature in `docs/00 §3` is implemented and exercised in a real browser. 117 unit tests
 (`src/core` plus the pure GitHub OAuth helpers); behaviour verified by harness scenarios (below).
 
-**3D model mode**: M13 (viewport) and M14 (face→texture + live link) are built; M15–M19 remain specified in `docs/11-3d-model-mode.md`.
+**3D model mode**: M13 (viewport), M14 (face→texture + live link) and M15 (painting on the model) are built; M16–M19 remain specified in `docs/11-3d-model-mode.md`.
 
 ## Tree
 
@@ -57,6 +57,8 @@ src/tools/                             one module per tool over a common interfa
   registry.ts index.ts types.ts        registration; unknown ids degrade to a no-op
   strokeEngine.ts brushTools.ts bucketTool.ts eyedropperTool.ts
   selectTool.ts marquee.ts shapeTool.ts textTool.ts panTool.ts
+  modelPaint.ts                        3D→2D paint routing: FaceHit → texel → stroke engine;
+                                       per-face segmentation, background doc creation
 
 src/app/                               stores + action layer
   docStore viewStore toolStore settingsStore    zustand
@@ -270,6 +272,10 @@ submission, not GPU rasterisation.
   `active()` returns null for them so every 2D consumer degrades to its no-document state
   unchanged. Both workspaces stay mounted; CSS hides the inactive one (`.workspace-slot`), so
   selector-driven code must target `.workspace:not(.workspace--model)` for the 2D canvas.
+- 3D strokes commit through `executeOn(docId, cmd)` — `execute()` targets the ACTIVE document,
+  which is the model while painting in 3D, and would silently drop the command. Stroke
+  segmentation identity is the target DOCUMENT, never the texture variable: a cube's six vars
+  usually resolve to one file.
 - The clipboard holds either pixels or an object. When both could apply, the system clipboard
   wins **unless** its bytes are the PNG we last wrote — that is our own object copy returning.
 - The text editing overlay commits on a real outside click, not on blur: the pointer-up that

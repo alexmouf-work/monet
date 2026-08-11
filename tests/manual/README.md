@@ -51,6 +51,7 @@ up with no build step.
 | `file-handler.mjs` | an OS "open with" launch: fake `launchQueue` + handles, then Ctrl+S writing back to the launched file |
 | `model3d.mjs` | M13: models from a fixture jar, WebGL2 render probe, Onshape navigation, hover picking, banner |
 | `model3d-face.mjs` | M14: dblclick/Enter/middle-click → texture, uv-rect selection, live 2-way link, uv guides |
+| `model3d-paint.mjs` | M15: brushes on the model, segmentation (no chord across faces), background texture doc, undo routing, eraser holes |
 | `github-login.mjs` | GitHub App sign-in: authorize URL, exchange, refresh, installations, forged-state refusal — all against a mocked GitHub |
 
 `shot()` deliberately waits two `requestAnimationFrame`s before capturing: a full-page

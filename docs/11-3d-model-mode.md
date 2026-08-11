@@ -69,7 +69,7 @@ Left-drag cannot orbit here — it paints.
 | `Ctrl`/`Shift` + middle-drag, or `Space`+drag | pan |
 | wheel | dolly (zoom at cursor) |
 | right-drag | orbit (alias, for mice without a usable middle button) |
-| left-drag | the active tool (paint, select, gizmo); **until M15 lands, left-drag orbits** |
+| left-drag | the active tool (brushes paint since M15; orbit when no face is under the cursor or a non-paint tool is active) |
 
 This moves middle-drag off "pan", which is a real break with the 2D habit. Mitigation: `Space` is
 pan in both modes, and a **Navigation preference** offers a Blockbench preset. Worth confirming.

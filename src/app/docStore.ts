@@ -62,8 +62,13 @@ interface DocState {
   markSaved(id: string): void;
 
   execute(cmd: Command): void;
+  /** Execute against a specific document — the 3D paint path, where the ACTIVE doc is the
+   *  model and the stroke's target is a texture document (docs/11 §8). */
+  executeOn(docId: string, cmd: Command): void;
   undo(): void;
   redo(): void;
+  undoFor(docId: string): void;
+  redoFor(docId: string): void;
   canUndo(): boolean;
   canRedo(): boolean;
 
@@ -195,6 +200,11 @@ export const useDocStore = create<DocState>((set, get) => ({
 
   execute(cmd) {
     const doc = get().active();
+    if (doc) get().executeOn(doc.id, cmd);
+  },
+
+  executeOn(docId, cmd) {
+    const doc = get().docs[docId];
     if (!doc) return;
     cmd.do(doc);
     doc.dirty = true;
@@ -208,6 +218,12 @@ export const useDocStore = create<DocState>((set, get) => ({
 
   undo() {
     const doc = get().active();
+    if (!doc) return;
+    get().undoFor(doc.id);
+  },
+
+  undoFor(docId) {
+    const doc = get().docs[docId];
     if (!doc) return;
     const h = get().histories[doc.id];
     if (!h?.undo.length) return;
@@ -227,6 +243,12 @@ export const useDocStore = create<DocState>((set, get) => ({
 
   redo() {
     const doc = get().active();
+    if (!doc) return;
+    get().redoFor(doc.id);
+  },
+
+  redoFor(docId) {
+    const doc = get().docs[docId];
     if (!doc) return;
     const h = get().histories[doc.id];
     if (!h?.redo.length) return;
