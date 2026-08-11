@@ -998,6 +998,16 @@ kbd {
   box-shadow: inset 2px 0 0 var(--accent);
 }
 
+/* UV editor canvas (docs/11 §10.2): live texture + face rects, texel-snapped drags. */
+.uvcanvas {
+  width: 100%;
+  image-rendering: pixelated;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: crosshair;
+  touch-action: none;
+}
+
 .outliner__warn {
   margin-left: auto;
   color: var(--danger);

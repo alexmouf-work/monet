@@ -10,8 +10,8 @@ Full feature inventory (the contract): `docs/00-overview.md` §3.
 Exclusions (do not build): §4 — stickers, magic select, extra Paint 3D brushes, lasso
 select, effects beyond noise/recolour, animation/mcmeta editing, collaboration.
 **"3D anything" and "any server component" no longer apply** — see the superseded table.
-3D model mode: spec `docs/11-3d-model-mode.md`; M13–M16 built (viewport, face→texture,
-painting, modelling), M17–M19 remain (UV editing, interaction polish, export/round-trip).
+3D model mode: spec `docs/11-3d-model-mode.md`; M13–M17 built (viewport, face→texture,
+painting, modelling, UV editing), M18–M19 remain (interaction polish, export/round-trip).
 
 ## Durable owner decisions
 
@@ -46,6 +46,7 @@ browser. See docs/ARCHITECTURE.md for the as-built map and ROADMAP.csv for per-m
 | ---- | ---- |
 | 2026-08-09 | v1 technical specification, docs/00–10 (commit 081e6de). |
 | 2026-08-09 | Charter + progress-docs system (this governance layer). |
+| 2026-08-11 | **M17 — UV editing**: a UV tab (models only) with per-face rects as numeric fields, box-UV auto-mapping (classic cross, texel origin, one undo step), 90° rotation cycling, mirror by endpoint swap, fit-to-face (vanilla projection), copy/paste UV, face on/off, and a live-texture canvas where rects drag/resize on the texel lattice. |
 | 2026-08-11 | **M16 — modelling I**: cubes added/duplicated/mirrored/deleted through commands; numeric-first properties (fields take arithmetic, snap illegal rotations in vanillaMode, flag them in free mode); translate gizmo with 1/16-lattice snapping (⇧ half, Alt free); selectable outliner; vanilla-JSON save that Minecraft loads; `S`/`H` switch select/pan on models; undo spans geometry + painted-texture histories newest-first. Deviations in docs/11 §12/§13.1/§16. |
 | 2026-08-10 | **M15 — painting on the model**: the 2D brushes (pen/marker/eraser/bucket/eyedropper, same settings, texel-sized) paint directly on the 3D model through the existing stroke engine; one drag = one undo step even across faces, with no interpolation across UV discontinuities; Ctrl+Z from the model tab undoes on the texture; erasing punches real cutout holes. |
 | 2026-08-10 | **M14 — faces to textures**: double-click / middle-click / Enter (viewport-centre fallback) open the texture behind a face with its uv rect selected; open texture docs are live-linked both ways with the 3D view; UV guides overlay the 2D editor; region write-back plumbed for sheet atlases. |

@@ -31,8 +31,8 @@ export interface MonetDebug {
   resetPerf(): void;
   /** Active 3D model document state, camera and hover — null when a 2D doc is focused. */
   model(): unknown;
-  /** The active model's elements (id, from, to) — the harness aims gizmo drags with this. */
-  modelElements(): { id: number; from: number[]; to: number[] }[];
+  /** The active model's elements — the harness aims gizmo drags and asserts uvs with this. */
+  modelElements(): { id: number; from: number[]; to: number[]; faces: unknown }[];
   /** Model-space point → canvas CSS px through the live camera, or null. */
   modelToScreen(x: number, y: number, z: number): { x: number; y: number } | null;
   /** Centre pixel of the 3D framebuffer — the "did anything render" probe. */
@@ -178,6 +178,7 @@ export function installDebugBridge(): void {
         id: e.id,
         from: [e.from.x, e.from.y, e.from.z],
         to: [e.to.x, e.to.y, e.to.z],
+        faces: JSON.parse(JSON.stringify(e.faces)) as typeof e.faces,
       }));
     },
     modelToScreen(x, y, z) {

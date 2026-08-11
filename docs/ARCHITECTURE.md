@@ -6,12 +6,13 @@ numbered spec (`docs/00`–`docs/10`) — do not duplicate it here; describe rea
 
 ## State: v1 complete (2026-08-09, M0–M12), plus owner requests since
 
-Every feature in `docs/00 §3` is implemented and exercised in a real browser. 160 unit tests
+Every feature in `docs/00 §3` is implemented and exercised in a real browser. 167 unit tests
 (`src/core` plus the pure GitHub OAuth helpers); behaviour verified by harness scenarios (below).
 
-**3D model mode**: M13 (viewport), M14 (face→texture + live link), M15 (painting on the model)
-and M16 (modelling: element CRUD, numeric properties, translate gizmo, vanilla validation,
-JSON writer) are built; M17–M19 remain specified in `docs/11-3d-model-mode.md`.
+**3D model mode**: M13 (viewport), M14 (face→texture + live link), M15 (painting on the model),
+M16 (modelling: element CRUD, numeric properties, translate gizmo, vanilla validation, JSON
+writer) and M17 (UV editing: box-UV, per-face rects/rotation/mirror, the UV tab over the live
+texture) are built; M18–M19 remain specified in `docs/11-3d-model-mode.md`.
 
 ## Tree
 
@@ -45,6 +46,7 @@ src/core/model3d/                      PURE 3D: types, vec/mat4, orbit camera, j
   commands.ts                          Add/Remove/PatchElement — snapshot-based, docStore.executeModel
   edit.ts validate.ts expr.ts          newCube/duplicate/mirror; vanilla legality; field arithmetic
   javaModelWriter.ts                   vanilla-shaped JSON out (tab indent, #var faces, MC key order)
+  uv.ts                                box-UV cross, mirror = endpoint swap, fit = vanilla projection
 
 src/engine3d/glRenderer.ts             raw WebGL2 viewport (D11.1): mesh+line programs,
                                        NEAREST textures, frontFace(CW), context-loss rebuild
@@ -92,7 +94,8 @@ src/ui/                                React; no business logic
   GithubAccount.tsx                    sign-in / signed-in block, shared by two dialogs
   ModelWorkspace.tsx                   3D workspace: renderer lifecycle, Onshape navigation,
                                        hover picking, translate gizmo, DOM view cube;
-                                       panels/ModelPanel.tsx (outliner + numeric properties)
+                                       panels/{Model,UV}Panel.tsx (outliner + numeric properties;
+                                       uv rects over the live texture), controls/NumField.tsx
   InstallBanner.tsx                    install offer; its pitch is the file association
   SourcesSidebar TextEditOverlay UpdatePrompt sceneHooks useShortcuts fonts theme.css
   panels/{Brushes,Shapes,Text,Canvas,Noise,Recolour}Panel.tsx
@@ -119,7 +122,8 @@ with fake handles that record what gets written back) · `model3d` (M13 acceptan
 fixture jar with a real parent chain) · `model3d-face` (M14: face→texture triggers, uv-rect
 selection, the live 2-way link, uv guides) · `model3d-paint` (M15: brushes on the model, stroke
 segmentation, cross-history undo order) · `model3d-edit` (M16: the stool build — fields,
-duplicate/mirror, gizmo snapping, vanillaMode, JSON save). Fixture jars are built fresh each run by
+duplicate/mirror, gizmo snapping, vanillaMode, JSON save) · `model3d-uv` (M17: box-UV on a
+64×32 sheet, fill-lands-in-rect, face editors, rect dragging). Fixture jars are built fresh each run by
 `tests/manual/fixtures/jar.mjs` (Node-side zip + hand-rolled PNG encoder) — nothing depends on
 leftover /tmp files. The harness launches Chromium with swiftshader flags so WebGL2 works
 headless.

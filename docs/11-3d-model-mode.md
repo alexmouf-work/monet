@@ -472,6 +472,7 @@ switch to select/pan, exactly as the topbar buttons advertise (2D parity). Axis 
 grabbing that axis's arrow; `Alt`/`Shift` snapping works as specified. Rotate and scale are the
 numeric fields (angle/axis/pivot, from/to) per §10.1's numeric-first rule; gizmo modes, `X Y Z`
 constraints and `Tab` depth cycling move to M18 with the rest of the interaction layer.
+`U` (M17) opens the UV tab — 2D uses it for Shapes, which models do not have.
 
 ---
 
@@ -591,6 +592,17 @@ Per-face UV rects with numeric fields; box-UV auto-map; face rotation/mirror; fi
 copy/paste UV; the UV editor panel over the live texture.
 **Accept:** box-UV a new cube onto a 64×32 sheet and see all six faces land in the right places in
 both the UV panel and the 3D view.
+
+**As built:** a **UV** feature tab (models only; `U` opens it). Box-UV lays the classic cross —
+`[up|down]` over `[east|north|west|south]` — at a texel origin, sized from the element's
+dimensions, converted to 0..16 units over the sheet; one command for all six faces. Mirror is an
+endpoint swap on the rect (rendering and picking interpolate endpoints, so inverted = mirrored —
+no extra state). Fit is the vanilla projection. Face on/off toggles exist on the panel. The
+canvas draws the live pixel store with every same-texture rect of the element; the selected rect
+drags/resizes with texel snapping (⇧ half, Alt free) and commits one command per drag via the
+gizmo's rewind pattern. Verified by `model3d-uv.mjs`: exact cross rects on 64×32; a bucket fill
+on the south face lands in exactly south's 16×16 cell of the sheet; rotate/mirror/fit/copy/paste
+numerically checked; drag = one undo step.
 
 ### M18 — Onshape-grade interaction
 Inference and snapping engine; selection filters and depth cycling; measurement readouts;

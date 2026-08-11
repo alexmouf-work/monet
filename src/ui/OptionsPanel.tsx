@@ -7,6 +7,7 @@ import { CanvasPanel } from './panels/CanvasPanel';
 import { NoisePanel } from './panels/NoisePanel';
 import { RecolourPanel } from './panels/RecolourPanel';
 import { ModelPanel } from './panels/ModelPanel';
+import { UVPanel } from './panels/UVPanel';
 import { ColorPanel } from './ColorPanel';
 
 export function OptionsPanel({ onResizeCanvas }: { onResizeCanvas(): void }) {
@@ -21,6 +22,7 @@ export function OptionsPanel({ onResizeCanvas }: { onResizeCanvas(): void }) {
         {tab === 'noise' && <NoisePanel />}
         {tab === 'recolour' && <RecolourPanel />}
         {tab === 'model' && <ModelPanel />}
+        {tab === 'uv' && <UVPanel />}
       </div>
       <ColorPanel />
     </aside>

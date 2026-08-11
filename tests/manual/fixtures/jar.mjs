@@ -147,6 +147,11 @@ const MODELS = {
     parent: 'minecraft:item/generated',
     textures: { layer0: 'minecraft:item/apple' },
   },
+  // A full cube on a 64×32 sheet — the M17 box-UV acceptance target (docs/11 §16).
+  'assets/minecraft/models/block/gauge.json': {
+    parent: 'minecraft:block/cube_all',
+    textures: { all: 'minecraft:block/sheet' },
+  },
 };
 
 /**
@@ -167,6 +172,13 @@ export async function writeModelJar(path) {
     ),
   );
   zip.file('assets/minecraft/textures/item/apple.png', makePng(16, 16, [224, 60, 60, 255]));
+  // 64×32 sheet in quiet greys — box-UV probes paint onto it and read texels back.
+  zip.file(
+    'assets/minecraft/textures/block/sheet.png',
+    makePng(64, 32, (x, y) =>
+      ((x >> 4) + (y >> 4)) % 2 ? [110, 110, 110, 255] : [150, 150, 150, 255],
+    ),
+  );
   for (const [p, json] of Object.entries(MODELS)) zip.file(p, JSON.stringify(json));
   const bytes = await zip.generateAsync({ type: 'nodebuffer' });
   await writeFile(path, bytes);

@@ -123,7 +123,7 @@ export function App() {
   useEffect(() => {
     const ts = useToolStore.getState();
     if (activeIsModel) ts.setTab('model');
-    else if (ts.tab === 'model') ts.setTab('brushes');
+    else if (ts.tab === 'model' || ts.tab === 'uv') ts.setTab('brushes');
   }, [activeIsModel]);
 
   useEffect(

@@ -3,10 +3,9 @@
  * field accepting arithmetic; the gizmo is a convenience over the number, never the only
  * route. Vanilla legality validates continuously — vanillaMode snaps, free mode flags.
  */
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useDocStore } from '../../app/docStore';
 import { invalidate } from '../../app/bus';
-import { evalExpr } from '../../core/model3d/expr';
 import {
   AddElementCommand,
   PatchElementCommand,
@@ -16,43 +15,7 @@ import { duplicateElement, mirrorElement, newCube } from '../../core/model3d/edi
 import { snapLegalAngle, validateModel } from '../../core/model3d/validate';
 import type { Axis, ModelElement } from '../../core/model3d/types';
 import { frameModel, snapView, updateCamera, viewPrefs } from '../ModelWorkspace';
-
-/** Numeric field with arithmetic: commits on Enter/blur, reverts on parse failure. */
-function NumField({
-  label,
-  value,
-  onCommit,
-  width = 52,
-}: {
-  label: string;
-  value: number;
-  onCommit(v: number): void;
-  width?: number;
-}) {
-  const [text, setText] = useState(String(value));
-  useEffect(() => setText(String(value)), [value]);
-  const commit = () => {
-    const v = evalExpr(text);
-    if (v === null) setText(String(value));
-    else if (v !== value) onCommit(v);
-  };
-  return (
-    <label className="numfield" title={label}>
-      <span>{label}</span>
-      <input
-        type="text"
-        style={{ width }}
-        value={text}
-        spellCheck={false}
-        onChange={(e) => setText(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') commit();
-        }}
-      />
-    </label>
-  );
-}
+import { NumField } from '../controls/NumField';
 
 export function addCube(): void {
   const ds = useDocStore.getState();

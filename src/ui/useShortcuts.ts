@@ -95,6 +95,10 @@ function handleModelKey(e: KeyboardEvent): boolean {
     case 'KeyH':
       useToolStore.getState().setTool('pan');
       return true;
+    // `U` opens the UV tab here (2D uses it for Shapes, which models don't have).
+    case 'KeyU':
+      useToolStore.getState().setTab('uv');
+      return true;
     case 'BracketLeft':
       useToolStore.getState().nudgeSize(-1);
       return true;
