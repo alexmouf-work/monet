@@ -25,6 +25,8 @@ export interface ModelScene {
   accent: string; // CSS hex from the theme
   /** Translate-gizmo origin in model space, or null (docs/11 §10.1 item 4). */
   gizmo: { x: number; y: number; z: number } | null;
+  /** Inference plane held by the current drag (docs/11 §10.1 item 2), or null. */
+  snapLine: { axis: 'x' | 'y' | 'z'; value: number } | null;
   surround: string; // CSS hex from the theme
   flatShade: boolean;
   grid: boolean;
@@ -479,6 +481,33 @@ export class ModelRenderer {
       gl.drawArrays(gl.LINES, 2, 2);
       gl.uniform4f(color, 0.3, 0.55, 0.95, 1);
       gl.drawArrays(gl.LINES, 4, 2);
+      gl.deleteBuffer(buf);
+      gl.enable(gl.DEPTH_TEST);
+    }
+
+    // Inference plane (docs/11 §10.1 item 2): the aligned coordinate as an accent-coloured
+    // outline square over everything, so "why did it stick here" is always answered visually.
+    if (scene.snapLine) {
+      gl.disable(gl.DEPTH_TEST);
+      gl.useProgram(this.lineProgram);
+      gl.uniformMatrix4fv(gl.getUniformLocation(this.lineProgram, 'uMVP'), false, mvp);
+      const { axis, value: v } = scene.snapLine;
+      const lo = -4;
+      const hi = 20;
+      // Rectangle outline in the two perpendicular axes at `axis = v`.
+      const pt = (a: number, b: number): [number, number, number] =>
+        axis === 'x' ? [v, a, b] : axis === 'y' ? [a, v, b] : [a, b, v];
+      const corners = [pt(lo, lo), pt(hi, lo), pt(hi, hi), pt(lo, hi)];
+      const verts: number[] = [];
+      for (let i = 0; i < 4; i++) verts.push(...corners[i], ...corners[(i + 1) % 4]);
+      const buf = gl.createBuffer()!;
+      gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(verts), gl.STREAM_DRAW);
+      gl.enableVertexAttribArray(0);
+      gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+      const [sr, sg, sb] = hexToRGB(scene.accent);
+      gl.uniform4f(gl.getUniformLocation(this.lineProgram, 'uColor'), sr, sg, sb, 0.9);
+      gl.drawArrays(gl.LINES, 0, 8);
       gl.deleteBuffer(buf);
       gl.enable(gl.DEPTH_TEST);
     }

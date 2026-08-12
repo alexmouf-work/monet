@@ -166,6 +166,11 @@ export function installDebugBridge(): void {
               v: Math.round(modelHover()!.uvNorm.v * 1000) / 1000,
             }
           : null,
+        // Selection depth (docs/11 §10.1 item 3): element, then face, then nothing.
+        selected: {
+          element: useDocStore.getState().selectedElementId,
+          face: useDocStore.getState().selectedFace,
+        },
       };
     },
     modelCenterPixel() {

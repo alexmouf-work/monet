@@ -4,7 +4,7 @@
  * pans, wheel dollies at the cursor, right-drag is an orbit alias. Left-drag routes to
  * the active tool — paint strokes, select/gizmo, pan — and orbits otherwise.
  */
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useDocStore } from '../app/docStore';
 import { useToolStore } from '../app/toolStore';
 import { onInvalidate, invalidate } from '../app/bus';
@@ -41,10 +41,19 @@ import type { FaceHit, Model3D } from '../core/model3d/types';
 import {
   modelHover as hoverNow,
   modelRenderer as rendererNow,
+  reportDragReadout,
   reportHover,
   setModelRenderer,
   subscribeModelHover,
 } from '../app/modelViewState';
+import { inferAxisSnap } from '../core/model3d/infer';
+import {
+  addCube,
+  deleteSelectedElement,
+  duplicateSelectedElement,
+  mirrorSelectedElement,
+  removeSelectedFace,
+} from '../app/modelEditActions';
 import { isTypingTarget } from './Workspace';
 
 /** 3D view prefs shared with panels; module state — no store ceremony needed yet. */
@@ -118,10 +127,18 @@ export function snapView(view: StandardView, orthographic = true): void {
   });
 }
 
+/** Right-click context state: host-relative position + what was under the cursor. */
+interface MenuState {
+  x: number;
+  y: number;
+  hit: FaceHit | null;
+}
+
 export function ModelWorkspace() {
   const hostRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const spaceRef = useRef(false);
+  const [menu, setMenu] = useState<MenuState | null>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current!;
@@ -149,6 +166,7 @@ export function ModelWorkspace() {
         selectedElement: selected?.id ?? -1,
         accent: themeColors().accent,
         gizmo: selected ? elementCentre(selected) : null,
+        snapLine: snapPlane,
         surround: themeColors().surround,
         flatShade: viewPrefs.flatShade,
         grid: viewPrefs.grid,
@@ -178,6 +196,8 @@ export function ModelWorkspace() {
       before: ModelElement;
       startT: number;
     } | null = null;
+    /** Inference plane held by the current drag — getScene hands it to the renderer. */
+    let snapPlane: { axis: Axis; value: number } | null = null;
 
     /** Model-space point → canvas px, through the same matrices the renderer uses. */
     const toScreen = (p: Vec3) => {
@@ -260,6 +280,7 @@ export function ModelWorkspace() {
     };
 
     const onPointerDown = (e: PointerEvent) => {
+      setMenu(null);
       canvas.setPointerCapture(e.pointerId);
       last = { x: e.clientX, y: e.clientY };
       moved = 0;
@@ -319,8 +340,17 @@ export function ModelWorkspace() {
         if (!model || !el) return;
         const origin = elementCentre(gizmoDrag.before);
         let delta = axisParam(origin, gizmoDrag.axis, e) - gizmoDrag.startT;
-        // Snapping (docs/11 §10.1): the 1/16 lattice by default, ⇧ for half, Alt for free.
-        if (!e.altKey) delta = Math.round(delta / (e.shiftKey ? 0.5 : 1)) * (e.shiftKey ? 0.5 : 1);
+        // Snapping (docs/11 §10.1): the 1/16 lattice by default, ⇧ for half, Alt for free —
+        // and inference beats the lattice near an alignment with another element's
+        // face/centre, which is how a fractional neighbour is reached without typing.
+        let snap: ReturnType<typeof inferAxisSnap> = null;
+        if (!e.altKey) {
+          const step = e.shiftKey ? 0.5 : 1;
+          snap = inferAxisSnap(gizmoDrag.before, model.elements, gizmoDrag.axis, delta, 0.35);
+          delta = snap ? snap.delta : Math.round(delta / step) * step;
+        }
+        snapPlane = snap ? { axis: gizmoDrag.axis, value: snap.at } : null;
+        reportDragReadout({ axis: gizmoDrag.axis, delta, inference: !!snap });
         applyAxisDelta(el, gizmoDrag.before, gizmoDrag.axis, delta);
         invalidate(true); // geometry changed → mesh rebuild
         return;
@@ -358,6 +388,8 @@ export function ModelWorkspace() {
           }
         }
         gizmoDrag = null;
+        snapPlane = null;
+        reportDragReadout(null);
         drag = null;
         return;
       }
@@ -366,7 +398,9 @@ export function ModelWorkspace() {
         drag = null;
         return;
       }
-      // Select tool: a left CLICK (no drag) picks the element under the cursor.
+      // Select tool: a left CLICK (no drag) picks the element under the cursor — and a
+      // second click on the already-selected element goes one level deeper, to the face
+      // under the cursor (docs/11 §10.1 item 3: click cycles depth, Esc climbs out).
       if (
         drag === 'orbit' &&
         e.button === 0 &&
@@ -374,12 +408,26 @@ export function ModelWorkspace() {
         useToolStore.getState().active === 'select'
       ) {
         const hit = hitAt(e);
-        useDocStore.getState().selectElement(hit ? hit.elementId : null);
+        const ds = useDocStore.getState();
+        if (hit && hit.elementId === ds.selectedElementId) ds.selectFace(hit.face);
+        else ds.selectElement(hit ? hit.elementId : null);
       }
+      // A right CLICK (no drag) opens the context menu for what is under the cursor
+      // (docs/11 §10.1 item 5); right-DRAG stays the orbit alias.
+      const wasRightClick = drag === 'orbit' && e.button === 2 && moved < 3;
       // A middle CLICK (no drag) opens the face's texture (docs/11 §9.1); the 3-px slop is
       // what separates it from the start of an orbit.
       const wasMiddleClick = drag === 'orbit' && e.button === 1 && moved < 3;
       drag = null;
+      if (wasRightClick) {
+        const ds = useDocStore.getState();
+        const model = ds.activeModel();
+        const ray = rayAt(e);
+        const hit = model && ray ? pickModel(model.elements, ray) : null;
+        if (hit) ds.selectElement(hit.elementId); // menu actions target the selection
+        const r = host.getBoundingClientRect();
+        setMenu({ x: e.clientX - r.left, y: e.clientY - r.top, hit });
+      }
       if (wasMiddleClick) {
         const model = useDocStore.getState().activeModel();
         const ray = rayAt(e);
@@ -454,6 +502,75 @@ export function ModelWorkspace() {
         style={{ cursor: isPaintTool(activeTool) ? 'crosshair' : 'default' }}
       />
       <ViewCube />
+      {menu && <ModelContextMenu menu={menu} onClose={() => setMenu(null)} />}
+    </div>
+  );
+}
+
+/**
+ * Right-click menu — docs/11 §10.1 item 5: the operations relevant to what was clicked.
+ * Actions run against the selection (the opener selected the hit element first).
+ */
+function ModelContextMenu({ menu, onClose }: { menu: MenuState; onClose(): void }) {
+  useEffect(() => {
+    // Any outside press or Escape closes; capture-phase Escape also keeps the global
+    // selection ladder from firing on the same press.
+    const down = () => onClose();
+    const key = (e: KeyboardEvent) => {
+      if (e.code === 'Escape') {
+        e.stopImmediatePropagation();
+        onClose();
+      }
+    };
+    window.addEventListener('pointerdown', down);
+    window.addEventListener('keydown', key, true);
+    return () => {
+      window.removeEventListener('pointerdown', down);
+      window.removeEventListener('keydown', key, true);
+    };
+  }, [onClose]);
+
+  const run = (fn: () => void) => () => {
+    fn();
+    onClose();
+  };
+
+  const hit = menu.hit;
+  const items: { label: string; action(): void }[] = hit
+    ? [
+        { label: 'Duplicate (Ctrl+D)', action: duplicateSelectedElement },
+        { label: 'Mirror x', action: () => mirrorSelectedElement('x') },
+        { label: 'Mirror y', action: () => mirrorSelectedElement('y') },
+        { label: 'Mirror z', action: () => mirrorSelectedElement('z') },
+        {
+          label: `Open ${hit.face} texture (Enter)`,
+          action: () => {
+            const model = useDocStore.getState().activeModel();
+            if (model) void openFaceTexture(model, hit);
+          },
+        },
+        { label: `Turn ${hit.face} face off`, action: () => removeSelectedFace(hit.face) },
+        { label: 'Delete (Del)', action: deleteSelectedElement },
+      ]
+    : [
+        { label: 'Add cube (N)', action: addCube },
+        { label: 'Frame model (Ctrl+0)', action: frameModel },
+        { label: 'Front view (1)', action: () => snapView('front') },
+        { label: 'Right view (3)', action: () => snapView('right') },
+        { label: 'Top view (7)', action: () => snapView('top') },
+      ];
+
+  return (
+    <div
+      className="ctxmenu"
+      style={{ left: menu.x, top: menu.y }}
+      onPointerDown={(e) => e.stopPropagation()}
+    >
+      {items.map((item) => (
+        <button key={item.label} className="ctxmenu__item" onClick={run(item.action)}>
+          {item.label}
+        </button>
+      ))}
     </div>
   );
 }

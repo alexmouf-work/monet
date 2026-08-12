@@ -462,6 +462,7 @@ disabled — they reappear the moment a texture document is focused, which is on
 | `X` `Y` `Z` | constrain the active gizmo to an axis; twice → the plane |
 | `Tab` | cycle selection depth (group → element → face) |
 | `Alt` (hold) | disable snapping · `Shift` (hold) | fine snap |
+| `Esc` | climb out one selection level (M18: face → element → nothing) |
 | `B` `M` `E` `F` `I` | brushes, unchanged — they paint on the model |
 
 `G` is currently unbound in 2D; `N` and `Enter` are free. Nothing in the 2D map changes.
@@ -609,6 +610,19 @@ Inference and snapping engine; selection filters and depth cycling; measurement 
 context menus; view-cube refinements; multi-select transforms.
 **Accept:** align a cube face-to-face with another using only inference (no typing); measure a
 2-texel gap and have it agree with the numbers.
+
+**As built:** inference runs on gizmo drags — my from/to/centre against every other visible
+element's from/to/centre on the drag axis, winning over the lattice within 0.35 units, with the
+aligned plane drawn as an accent outline square and a live `Δaxis` readout (plus `⌖ aligned`) in
+the status bar. Measurement is the selected↔hovered axis-aligned clear space in the same cell,
+in model units = texels. Click cycles depth element → face and `Esc` climbs back out (face →
+element → nothing); the face selection is `docStore.selectedFace`, which the UV panel follows.
+Right-click opens a context menu — element ops plus that face's texture when over geometry, add
+cube and the view presets over empty space — while right-DRAG stays the orbit alias.
+Verified by `model3d-snap.mjs`: a cube aligns to a neighbour's face at x = 5.7, a coordinate the
+integer lattice cannot produce, by dragging alone. **Not built:** selection *filters*
+(box-select restricted to faces), multi-select transforms, and view-cube refinements — the
+single-selection ladder covers the acceptance case; deferred rather than half-built.
 
 ### M19 — Export and round-trip
 Java block/item writer preserving unknown keys and key order; Bedrock `.geo.json`;

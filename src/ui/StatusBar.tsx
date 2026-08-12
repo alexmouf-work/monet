@@ -6,6 +6,8 @@ import { useToolStore } from '../app/toolStore';
 import { zoomPercent, ZOOM_MAX, ZOOM_MIN } from '../engine/viewport';
 import { getCursor, subscribeCursor } from './Workspace';
 import { modelHover, subscribeModelHover } from './ModelWorkspace';
+import { dragReadout, subscribeDragReadout } from '../app/modelViewState';
+import { boxGaps } from '../core/model3d/infer';
 
 const DEFAULT_VIEW = { zoom: 8, panX: 0, panY: 0 };
 
@@ -22,9 +24,11 @@ export function StatusBar() {
   const color = useToolStore((s) => s.color);
   const alpha = useToolStore((s) => s.alpha);
 
+  const selectedElementId = useDocStore((s) => s.selectedElementId);
   const [, force] = useState(0);
   useEffect(() => subscribeCursor(() => force((n) => n + 1)), []);
   useEffect(() => subscribeModelHover(() => force((n) => n + 1)), []);
+  useEffect(() => subscribeDragReadout(() => force((n) => n + 1)), []);
   const cursor = getCursor();
 
   if (model) {
@@ -35,12 +39,32 @@ export function StatusBar() {
       h && tex && tex.kind === 'file'
         ? `${Math.min(tex.width - 1, Math.floor(h.uvNorm.u * tex.width))}, ${Math.min(tex.height - 1, Math.floor(h.uvNorm.v * tex.height))}`
         : null;
+    // Live drag readout (docs/11 §10.1 item 4) and the selected↔hovered measurement
+    // (item 6): axis-aligned clear space, in model units = texels at 16 px per block.
+    const r2 = (n: number) => Math.round(n * 100) / 100;
+    const dr = dragReadout();
+    const sel = model.elements.find((e) => e.id === selectedElementId);
+    const hov =
+      h && h.elementId !== sel?.id ? model.elements.find((e) => e.id === h.elementId) : null;
+    let measure = '';
+    if (sel && hov) {
+      const gaps = boxGaps(sel, hov);
+      const parts = (['x', 'y', 'z'] as const)
+        .filter((a) => gaps[a] > 0)
+        .map((a) => `${a} ${r2(gaps[a])}`);
+      measure = `#${sel.id}↔#${hov.id} ${parts.length ? `gap ${parts.join(' · ')} px` : 'touching'}`;
+    }
     return (
       <footer className="statusbar">
         <span className="statusbar__cell statusbar__coords">
           {h ? `#${h.elementId} ${h.face}` : '—'}
         </span>
         <span className="statusbar__cell">{texel ? `texel ${texel}` : ''}</span>
+        <span className="statusbar__cell statusbar__measure">
+          {dr
+            ? `Δ${dr.axis} ${dr.delta >= 0 ? '+' : ''}${r2(dr.delta)}${dr.inference ? ' ⌖ aligned' : ''}`
+            : measure}
+        </span>
         <span className="statusbar__cell">
           {model.elements.length} element{model.elements.length === 1 ? '' : 's'}
         </span>

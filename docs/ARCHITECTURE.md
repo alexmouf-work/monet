@@ -6,13 +6,14 @@ numbered spec (`docs/00`–`docs/10`) — do not duplicate it here; describe rea
 
 ## State: v1 complete (2026-08-09, M0–M12), plus owner requests since
 
-Every feature in `docs/00 §3` is implemented and exercised in a real browser. 167 unit tests
+Every feature in `docs/00 §3` is implemented and exercised in a real browser. 172 unit tests
 (`src/core` plus the pure GitHub OAuth helpers); behaviour verified by harness scenarios (below).
 
 **3D model mode**: M13 (viewport), M14 (face→texture + live link), M15 (painting on the model),
 M16 (modelling: element CRUD, numeric properties, translate gizmo, vanilla validation, JSON
-writer) and M17 (UV editing: box-UV, per-face rects/rotation/mirror, the UV tab over the live
-texture) are built; M18–M19 remain specified in `docs/11-3d-model-mode.md`.
+writer), M17 (UV editing: box-UV, per-face rects/rotation/mirror, the UV tab over the live
+texture) and M18 (inference snapping, measurement, depth cycling, context menus — filters and
+multi-select deferred) are built; M19 remains specified in `docs/11-3d-model-mode.md`.
 
 ## Tree
 
@@ -47,6 +48,7 @@ src/core/model3d/                      PURE 3D: types, vec/mat4, orbit camera, j
   edit.ts validate.ts expr.ts          newCube/duplicate/mirror; vanilla legality; field arithmetic
   javaModelWriter.ts                   vanilla-shaped JSON out (tab indent, #var faces, MC key order)
   uv.ts                                box-UV cross, mirror = endpoint swap, fit = vanilla projection
+  infer.ts                             alignment inference on a drag axis; box gaps (measurement)
 
 src/engine3d/glRenderer.ts             raw WebGL2 viewport (D11.1): mesh+line programs,
                                        NEAREST textures, frontFace(CW), context-loss rebuild
@@ -76,7 +78,10 @@ src/app/                               stores + action layer
   modelActions.ts                      open/new/save models; per-doc texture pixel store;
                                        face→texture opening (uv-rect selection, region extract)
   modelTextureSync.ts                  the live 2-way link: open image docs ARE their textures
-  modelViewState.ts overlayRegistry.ts leaf modules: hover/renderer registry, overlay painters
+  modelEditActions.ts                  add/duplicate/delete/mirror/face-off — panel, keys and
+                                       context menu share one undoable route per edit
+  modelViewState.ts overlayRegistry.ts leaf modules: hover/renderer registry, overlay painters,
+                                       live gizmo-drag readout
   launchFiles.ts                       OS "open with" launches → docs bound to their handles
   installPrompt.ts                     beforeinstallprompt capture (installing enables that)
   autosave.ts debugBridge.ts
@@ -123,7 +128,8 @@ fixture jar with a real parent chain) · `model3d-face` (M14: face→texture tri
 selection, the live 2-way link, uv guides) · `model3d-paint` (M15: brushes on the model, stroke
 segmentation, cross-history undo order) · `model3d-edit` (M16: the stool build — fields,
 duplicate/mirror, gizmo snapping, vanillaMode, JSON save) · `model3d-uv` (M17: box-UV on a
-64×32 sheet, fill-lands-in-rect, face editors, rect dragging). Fixture jars are built fresh each run by
+64×32 sheet, fill-lands-in-rect, face editors, rect dragging) · `model3d-snap` (M18: fractional
+inference alignment, measurement, depth cycling, context menus). Fixture jars are built fresh each run by
 `tests/manual/fixtures/jar.mjs` (Node-side zip + hand-rolled PNG encoder) — nothing depends on
 leftover /tmp files. The harness launches Chromium with swiftshader flags so WebGL2 works
 headless.
@@ -296,6 +302,10 @@ submission, not GPU rasterisation.
   references — the commands test proves later edits cannot corrupt history). The gizmo applies
   its drag live but REWINDS to the grab-time snapshot before committing one PatchElementCommand,
   the same rewind-then-execute pattern strokes use.
+- A click on the SELECTED element's gizmo arm grabs the gizmo, not the element — correct, but it
+  means viewport click tests must aim away from the arms (they reach 7 units from the centre).
+- Model undo/redo drops a stale element selection: undoing an Add otherwise leaves the gizmo and
+  panel pointing at an element that no longer exists.
 - The clipboard holds either pixels or an object. When both could apply, the system clipboard
   wins **unless** its bytes are the PNG we last wrote — that is our own object copy returning.
 - The text editing overlay commits on a real outside click, not on blur: the pointer-up that

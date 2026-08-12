@@ -42,8 +42,13 @@ const clone = <T,>(v: T): T => JSON.parse(JSON.stringify(v));
 export function UVPanel() {
   const doc = useDocStore((s) => (s.activeId ? s.models[s.activeId] : null));
   const selectedId = useDocStore((s) => s.selectedElementId);
+  const storeFace = useDocStore((s) => s.selectedFace);
   useDocStore((s) => s.rev);
   const [face, setFace] = useState<Face>('north');
+  // Depth-2 selection from the viewport (click-cycling, docs/11 §10.1) drives this panel.
+  useEffect(() => {
+    if (storeFace) setFace(storeFace);
+  }, [storeFace]);
   const [origin, setOrigin] = useState({ u: 0, v: 0 });
   const [, force] = useState(0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -276,7 +281,10 @@ export function UVPanel() {
                   className={x === face ? 'is-active' : ''}
                   style={el.faces[x] ? undefined : { opacity: 0.4 }}
                   title={x + (el.faces[x] ? '' : ' (face off)')}
-                  onClick={() => setFace(x)}
+                  onClick={() => {
+                    setFace(x);
+                    if (el.id === selectedId) ds.selectFace(x);
+                  }}
                 >
                   {FACE_LETTER[x]}
                 </button>

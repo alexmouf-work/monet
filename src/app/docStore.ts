@@ -8,7 +8,7 @@ import type { Item, MonetDoc, Rect, SourceBinding } from '../core/model/types';
 import { isRaster } from '../core/model/types';
 import { HISTORY_LIMIT, type Command } from '../core/model/commands';
 import { createDoc } from '../core/model/document';
-import type { Model3D } from '../core/model3d/types';
+import type { Face, Model3D } from '../core/model3d/types';
 import type { ModelCommand } from '../core/model3d/commands';
 import { invalidateDoc, patchLayer } from '../engine/layerCache';
 import { invalidate } from './bus';
@@ -60,6 +60,8 @@ interface DocState {
   selectedObjectId: number | null;
   /** The selected 3D element of the active model (docs/11 §10.2). */
   selectedElementId: number | null;
+  /** One level deeper (docs/11 §10.1 item 3): a face of the selected element, or null. */
+  selectedFace: Face | null;
   rev: number;
 
   active(): MonetDoc | null;
@@ -96,6 +98,9 @@ interface DocState {
   setSelection(s: SelectionState | null): void;
   selectObject(id: number | null): void;
   selectElement(id: number | null): void;
+  selectFace(face: Face | null): void;
+  /** Clear the element selection when history removed the element it pointed at. */
+  dropStaleElementSelection(m: Model3D): void;
 }
 
 function applyCaches(doc: MonetDoc, cmd: Command) {
@@ -120,6 +125,7 @@ export const useDocStore = create<DocState>((set, get) => ({
   selection: null,
   selectedObjectId: null,
   selectedElementId: null,
+  selectedFace: null,
   rev: 0,
 
   active() {
@@ -197,7 +203,13 @@ export const useDocStore = create<DocState>((set, get) => ({
   },
 
   setActive(id) {
-    set({ activeId: id, selection: null, selectedObjectId: null, selectedElementId: null });
+    set({
+      activeId: id,
+      selection: null,
+      selectedObjectId: null,
+      selectedElementId: null,
+      selectedFace: null,
+    });
     get().bump();
   },
 
@@ -273,6 +285,7 @@ export const useDocStore = create<DocState>((set, get) => ({
           [m.id]: { undo: h.undo.slice(0, -1), redo: [...h.redo, cmd] },
         },
       }));
+      get().dropStaleElementSelection(m);
       get().bump();
       return;
     }
@@ -337,6 +350,7 @@ export const useDocStore = create<DocState>((set, get) => ({
           [m.id]: { undo: [...h.undo, cmd], redo: h.redo.slice(0, -1) },
         },
       }));
+      get().dropStaleElementSelection(m);
       get().bump();
       return;
     }
@@ -379,8 +393,21 @@ export const useDocStore = create<DocState>((set, get) => ({
   },
 
   selectElement(id) {
-    set({ selectedElementId: id });
+    // Changing depth-1 selection always climbs out of depth 2.
+    set({ selectedElementId: id, selectedFace: null });
     get().bump(false);
+  },
+
+  selectFace(face) {
+    set({ selectedFace: face });
+    get().bump(false);
+  },
+
+  dropStaleElementSelection(m) {
+    const id = get().selectedElementId;
+    if (id != null && !m.elements.some((e) => e.id === id)) {
+      set({ selectedElementId: null, selectedFace: null });
+    }
   },
 
   setSelection(s) {

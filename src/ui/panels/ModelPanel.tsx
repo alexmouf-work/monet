@@ -6,46 +6,17 @@
 import { useState } from 'react';
 import { useDocStore } from '../../app/docStore';
 import { invalidate } from '../../app/bus';
+import { PatchElementCommand } from '../../core/model3d/commands';
 import {
-  AddElementCommand,
-  PatchElementCommand,
-  RemoveElementsCommand,
-} from '../../core/model3d/commands';
-import { duplicateElement, mirrorElement, newCube } from '../../core/model3d/edit';
+  addCube,
+  deleteSelectedElement,
+  duplicateSelectedElement,
+  mirrorSelectedElement,
+} from '../../app/modelEditActions';
 import { snapLegalAngle, validateModel } from '../../core/model3d/validate';
 import type { Axis, ModelElement } from '../../core/model3d/types';
 import { frameModel, snapView, updateCamera, viewPrefs } from '../ModelWorkspace';
 import { NumField } from '../controls/NumField';
-
-export function addCube(): void {
-  const ds = useDocStore.getState();
-  const m = ds.activeModel();
-  if (!m) return;
-  const el = newCube(m.nextItemId);
-  m.nextItemId += 1;
-  ds.executeModel(new AddElementCommand('Add cube', el));
-  ds.selectElement(el.id);
-}
-
-export function duplicateSelectedElement(): void {
-  const ds = useDocStore.getState();
-  const m = ds.activeModel();
-  const el = m?.elements.find((e) => e.id === ds.selectedElementId);
-  if (!m || !el) return;
-  const copy = duplicateElement(el, m.nextItemId);
-  m.nextItemId += 1;
-  ds.executeModel(new AddElementCommand('Duplicate element', copy));
-  ds.selectElement(copy.id);
-}
-
-export function deleteSelectedElement(): void {
-  const ds = useDocStore.getState();
-  const m = ds.activeModel();
-  if (!m || ds.selectedElementId == null) return;
-  const id = ds.selectedElementId;
-  ds.selectElement(null);
-  ds.executeModel(new RemoveElementsCommand('Delete element', m, [id]));
-}
 
 export function ModelPanel() {
   const doc = useDocStore((s) => (s.activeId ? s.models[s.activeId] : null));
@@ -75,10 +46,7 @@ export function ModelPanel() {
     ds.executeModel(new PatchElementCommand(label, el, after));
   };
 
-  const mirror = (axis: Axis) => () => {
-    if (!el) return;
-    ds.executeModel(new PatchElementCommand(`Mirror ${axis}`, el, mirrorElement(el, axis)));
-  };
+  const mirror = (axis: Axis) => () => mirrorSelectedElement(axis);
 
   return (
     <div className="panel">

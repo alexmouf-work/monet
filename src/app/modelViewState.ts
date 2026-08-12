@@ -34,3 +34,28 @@ export function subscribeModelHover(fn: () => void): () => void {
 let renderer: ModelRenderer | null = null;
 export const setModelRenderer = (r: ModelRenderer | null): void => void (renderer = r);
 export const modelRenderer = (): ModelRenderer | null => renderer;
+
+/** Live gizmo-drag readout (docs/11 §10.1 item 4) — the status bar renders it. */
+export interface DragReadout {
+  axis: 'x' | 'y' | 'z';
+  delta: number;
+  /** True when an inference alignment (not just the lattice) is holding the value. */
+  inference: boolean;
+}
+
+let readout: DragReadout | null = null;
+const readoutListeners = new Set<() => void>();
+
+export function reportDragReadout(r: DragReadout | null): void {
+  readout = r;
+  for (const fn of readoutListeners) fn();
+}
+
+export const dragReadout = (): DragReadout | null => readout;
+
+export function subscribeDragReadout(fn: () => void): () => void {
+  readoutListeners.add(fn);
+  return () => {
+    readoutListeners.delete(fn);
+  };
+}

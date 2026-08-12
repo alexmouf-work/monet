@@ -6,7 +6,7 @@ import { useToolStore, type FeatureTab, type ToolId } from '../app/toolStore';
 import { getTool } from '../tools';
 import { frameModel, openLookedAtTexture, snapView, updateCamera } from './ModelWorkspace';
 import { lastPaintedDoc } from '../tools/modelPaint';
-import { addCube, deleteSelectedElement, duplicateSelectedElement } from './panels/ModelPanel';
+import { addCube, deleteSelectedElement, duplicateSelectedElement } from '../app/modelEditActions';
 import { nudgeSelected } from '../tools/selectTool';
 import { anchorSelection } from '../app/selectionActions';
 import { isTypingTarget } from './Workspace';
@@ -152,9 +152,17 @@ export function useShortcuts(actions: ShortcutActions) {
           e.preventDefault();
           return;
         }
-        // Swallow the rest of the 2D map: `U`/`T`/… open 2D-only tabs and `G` toggles the
-        // 2D grid. Esc and ? keep their global meanings.
-        if (e.code !== 'Escape' && e.code !== 'Slash') return;
+        // Esc climbs the selection ladder (docs/11 §10.1 item 3): armed pick → face →
+        // element → nothing.
+        if (e.code === 'Escape') {
+          if (ts.active === 'eyedropper' && ts.previous) ts.popTransient();
+          else if (ds.selectedFace) ds.selectFace(null);
+          else ds.selectElement(null);
+          return;
+        }
+        // Swallow the rest of the 2D map: `T`/… open 2D-only tabs and `G` toggles the
+        // 2D grid. ? keeps its global meaning.
+        if (e.code !== 'Slash') return;
       }
 
       if (mod) {
