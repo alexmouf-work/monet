@@ -131,7 +131,21 @@ const TAB_KEYS: Record<string, FeatureTab> = {
 export function useShortcuts(actions: ShortcutActions) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (isTypingTarget(e.target)) return;
+      // Typing owns the keyboard — with three exceptions. Save, Save As and Export mean the
+      // same thing wherever the caret is, and no text field claims those chords; suppressing
+      // them meant Ctrl+S silently did nothing while a numeric field had focus.
+      if (isTypingTarget(e.target)) {
+        if (!(e.ctrlKey || e.metaKey)) return;
+        if (e.code === 'KeyS') {
+          e.preventDefault();
+          if (e.shiftKey) actions.saveAs();
+          else actions.save();
+        } else if (e.code === 'KeyE' && e.shiftKey) {
+          e.preventDefault();
+          actions.exportAs();
+        }
+        return;
+      }
 
       const ds = useDocStore.getState();
       const vs = useViewStore.getState();

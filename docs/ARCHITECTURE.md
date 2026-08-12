@@ -6,14 +6,16 @@ numbered spec (`docs/00`–`docs/10`) — do not duplicate it here; describe rea
 
 ## State: v1 complete (2026-08-09, M0–M12), plus owner requests since
 
-Every feature in `docs/00 §3` is implemented and exercised in a real browser. 172 unit tests
+Every feature in `docs/00 §3` is implemented and exercised in a real browser. 183 unit tests
 (`src/core` plus the pure GitHub OAuth helpers); behaviour verified by harness scenarios (below).
 
-**3D model mode**: M13 (viewport), M14 (face→texture + live link), M15 (painting on the model),
-M16 (modelling: element CRUD, numeric properties, translate gizmo, vanilla validation, JSON
-writer), M17 (UV editing: box-UV, per-face rects/rotation/mirror, the UV tab over the live
-texture) and M18 (inference snapping, measurement, depth cycling, context menus — filters and
-multi-select deferred) are built; M19 remains specified in `docs/11-3d-model-mode.md`.
+**3D model mode** (`docs/11-3d-model-mode.md`): M13 (viewport), M14 (face→texture + live link),
+M15 (painting on the model), M16 (modelling: element CRUD, numeric properties, translate gizmo,
+vanilla validation, JSON writer), M17 (UV editing: box-UV, per-face rects/rotation/mirror, the UV
+tab over the live texture), M18 (inference snapping, measurement, depth cycling, context menus)
+and M19 (round-trip writers, Bedrock geometry, `.monet_model`, render-to-PNG) are built.
+Outstanding: the display-slot editor + preview, M18's selection filters and multi-select
+transforms (ROADMAP M19a and the M18 row).
 
 ## Tree
 
@@ -46,7 +48,10 @@ src/core/model3d/                      PURE 3D: types, vec/mat4, orbit camera, j
   {types,vec,camera,javaModel,vanillaParents,geometry,pick}.ts    parsing, mesh, ray picking
   commands.ts                          Add/Remove/PatchElement — snapshot-based, docStore.executeModel
   edit.ts validate.ts expr.ts          newCube/duplicate/mirror; vanilla legality; field arithmetic
-  javaModelWriter.ts                   vanilla-shaped JSON out (tab indent, #var faces, MC key order)
+  javaModelWriter.ts                   vanilla JSON out, MERGED OVER the source file: parent +
+                                       unknown keys survive; inherited geometry stays inherited
+  bedrockWriter.ts                     .geo.json 1.12.0 — mirrored x, pixel uvs, negated y/z spin
+  monetModelFile.ts                    .monet_model zip: manifest + model + camera (no pixels)
   uv.ts                                box-UV cross, mirror = endpoint swap, fit = vanilla projection
   infer.ts                             alignment inference on a drag axis; box gaps (measurement)
 
@@ -80,6 +85,7 @@ src/app/                               stores + action layer
   modelTextureSync.ts                  the live 2-way link: open image docs ARE their textures
   modelEditActions.ts                  add/duplicate/delete/mirror/face-off — panel, keys and
                                        context menu share one undoable route per edit
+  modelExportActions.ts                java / bedrock / .monet_model / render-to-PNG downloads
   modelViewState.ts overlayRegistry.ts leaf modules: hover/renderer registry, overlay painters,
                                        live gizmo-drag readout
   launchFiles.ts                       OS "open with" launches → docs bound to their handles
@@ -129,7 +135,8 @@ selection, the live 2-way link, uv guides) · `model3d-paint` (M15: brushes on t
 segmentation, cross-history undo order) · `model3d-edit` (M16: the stool build — fields,
 duplicate/mirror, gizmo snapping, vanillaMode, JSON save) · `model3d-uv` (M17: box-UV on a
 64×32 sheet, fill-lands-in-rect, face editors, rect dragging) · `model3d-snap` (M18: fractional
-inference alignment, measurement, depth cycling, context menus). Fixture jars are built fresh each run by
+inference alignment, measurement, depth cycling, context menus) · `model3d-export` (M19: clean
+Java round-trip, Bedrock conversion, project zip, icon render). Fixture jars are built fresh each run by
 `tests/manual/fixtures/jar.mjs` (Node-side zip + hand-rolled PNG encoder) — nothing depends on
 leftover /tmp files. The harness launches Chromium with swiftshader flags so WebGL2 works
 headless.
@@ -306,6 +313,15 @@ submission, not GPU rasterisation.
   means viewport click tests must aim away from the arms (they reach 7 units from the centre).
 - Model undo/redo drops a stale element selection: undoing an Add otherwise leaves the gizmo and
   panel pointing at an element that no longer exists.
+- A model document's `raw` (its source file's own JSON) and `baseline` (element signature at load)
+  are the round-trip contract — never rebuild a save from the resolved/flattened model alone, or
+  `parent`, mod keys and inherited geometry are silently rewritten.
+- The 3D canvas is `alpha: true` with straight alpha, and normal frames clear opaque; only
+  render-to-PNG clears transparent, through a scene filter that also drops grid/gizmo/selection.
+  An export must be the model, not a screenshot of the editor.
+- `Ctrl+S`/`Ctrl+Shift+S`/`Ctrl+Shift+E` are the only chords allowed to fire while a text or
+  numeric field has focus: no field claims them, and suppressing them made saving after typing a
+  value do nothing at all.
 - The clipboard holds either pixels or an object. When both could apply, the system clipboard
   wins **unless** its bytes are the PNG we last wrote — that is our own object copy returning.
 - The text editing overlay commits on a real outside click, not on blur: the pointer-up that

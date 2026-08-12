@@ -14,6 +14,7 @@ import {
   type RawJavaModel,
 } from '../core/model3d/javaModel';
 import { builtinParent } from '../core/model3d/vanillaParents';
+import { elementsSignature } from '../core/model3d/javaModelWriter';
 import { decodeImage } from '../engine/exporters';
 import { getSource, listSources, type SourceProvider } from '../integrations/sources';
 import { MAX_DIM, type Rect } from '../core/model/types';
@@ -170,6 +171,11 @@ export async function openModelFromSource(source: SourceProvider, path: string):
       missing: [...resolved.missing, ...missingTextures],
       ambientocclusion: resolved.ambientocclusion,
       guiLight: resolved.guiLight,
+      display: resolved.display as Model3D['display'],
+      // Round-trip baseline (docs/11 §13.1): the file's OWN json plus the geometry as loaded,
+      // so a save preserves `parent`/unknown keys and skips inherited, untouched `elements`.
+      raw: root as Record<string, unknown>,
+      baseline: elementsSignature(resolved.generated ? generatedElements() : resolved.elements),
       camera: frame(DEFAULT_CAMERA, ...boundsOf(resolved)),
       vanillaMode: true,
       nextItemId: resolved.elements.length + 1,

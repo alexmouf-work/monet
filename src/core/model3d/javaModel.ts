@@ -18,6 +18,8 @@ export interface RawJavaModel {
   textures?: Record<string, string>;
   elements?: RawElement[];
   display?: Record<string, unknown>;
+  /** Anything else the file carries — preserved on save (docs/11 §13.1). */
+  [key: string]: unknown;
 }
 
 export interface RawElement {
@@ -27,6 +29,7 @@ export interface RawElement {
   rotation?: { origin?: number[]; axis?: string; angle?: number; rescale?: boolean };
   shade?: boolean;
   faces?: Record<string, RawFace>;
+  [key: string]: unknown;
 }
 
 interface RawFace {
@@ -35,6 +38,26 @@ interface RawFace {
   rotation?: number;
   cullface?: string;
   tintindex?: number;
+  [key: string]: unknown;
+}
+
+/** Keys this build models explicitly; everything else is carried through verbatim. */
+const KNOWN_ELEMENT_KEYS = new Set(['name', 'from', 'to', 'rotation', 'shade', 'faces']);
+const KNOWN_FACE_KEYS = new Set(['uv', 'texture', 'rotation', 'cullface', 'tintindex']);
+
+/** The subset of `raw`'s own keys that `known` does not cover, or undefined when there are none. */
+function unknownKeys(
+  raw: Record<string, unknown>,
+  known: Set<string>,
+): Record<string, unknown> | undefined {
+  const out: Record<string, unknown> = {};
+  let any = false;
+  for (const [k, v] of Object.entries(raw))
+    if (!known.has(k)) {
+      out[k] = v;
+      any = true;
+    }
+  return any ? out : undefined;
 }
 
 export interface ResolvedJavaModel {
@@ -168,6 +191,7 @@ function normalizeElement(raw: RawElement, id: number): ModelElement {
       rotation: f.rotation === 90 || f.rotation === 180 || f.rotation === 270 ? f.rotation : 0,
       cullface: FACES.includes(f.cullface as Face) ? (f.cullface as Face) : undefined,
       tintindex: typeof f.tintindex === 'number' ? f.tintindex : undefined,
+      extra: unknownKeys(f, KNOWN_FACE_KEYS),
     };
   }
   const rot = raw.rotation;
@@ -190,6 +214,7 @@ function normalizeElement(raw: RawElement, id: number): ModelElement {
     shade: raw.shade,
     visible: true,
     locked: false,
+    extra: unknownKeys(raw, KNOWN_ELEMENT_KEYS),
   };
 }
 

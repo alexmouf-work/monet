@@ -37,6 +37,8 @@ export interface MonetDebug {
   modelToScreen(x: number, y: number, z: number): { x: number; y: number } | null;
   /** Centre pixel of the 3D framebuffer — the "did anything render" probe. */
   modelCenterPixel(): number[] | null;
+  /** A clean render-to-PNG pass as plain arrays — what an exported icon contains (§13.3). */
+  modelFrame(): { pixels: number[]; width: number; height: number } | null;
 }
 
 export function installDebugBridge(): void {
@@ -176,6 +178,10 @@ export function installDebugBridge(): void {
     modelCenterPixel() {
       const r = modelRenderer();
       return r ? [...r.readCenter()] : null;
+    },
+    modelFrame() {
+      const frame = modelRenderer()?.readFrame();
+      return frame ? { ...frame, pixels: Array.from(frame.pixels) } : null;
     },
     modelElements() {
       const m = useDocStore.getState().activeModel();

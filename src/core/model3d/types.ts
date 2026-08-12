@@ -30,6 +30,8 @@ export interface ModelFace {
   rotation?: 0 | 90 | 180 | 270;
   cullface?: Face;
   tintindex?: number;
+  /** Keys this build does not model, carried through a save (docs/11 §13.1). */
+  extra?: Record<string, unknown>;
 }
 
 export interface ModelElement {
@@ -43,6 +45,8 @@ export interface ModelElement {
   shade?: boolean;
   visible: boolean;
   locked: boolean;
+  /** Keys this build does not model, carried through a save (docs/11 §13.1). */
+  extra?: Record<string, unknown>;
 }
 
 export interface ModelGroup {
@@ -95,10 +99,41 @@ export interface Model3D {
   missing: string[];
   ambientocclusion?: boolean;
   guiLight?: 'front' | 'side';
+  /** `display` slots as read, merged down the parent chain (docs/11 §10.2). */
+  display?: Record<string, DisplaySlot>;
+  /**
+   * The SOURCE FILE's own JSON, untouched — the round-trip baseline (docs/11 §13.1). Writing
+   * merges over it, so `parent` and any key this build does not model survive an edit.
+   * Typed loosely to keep this module import-free.
+   */
+  raw?: Record<string, unknown>;
+  /** JSON of the elements as loaded: unchanged + inherited geometry needs no `elements` out. */
+  baseline?: string;
   camera: CameraState;
   vanillaMode: boolean;
   nextItemId: number;
 }
+
+/** One `display` slot: Minecraft's rotation (deg), translation (−80..80) and scale (≤4). */
+export interface DisplaySlot {
+  rotation?: Vec3;
+  translation?: Vec3;
+  scale?: Vec3;
+}
+
+/** The display slots Minecraft honours, in its own order. */
+export const DISPLAY_SLOTS = [
+  'thirdperson_righthand',
+  'thirdperson_lefthand',
+  'firstperson_righthand',
+  'firstperson_lefthand',
+  'gui',
+  'head',
+  'ground',
+  'fixed',
+] as const;
+
+export type DisplaySlotName = (typeof DISPLAY_SLOTS)[number];
 
 /** What a ray through the viewport found (docs/11 §7). */
 export interface FaceHit {

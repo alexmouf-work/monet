@@ -10,6 +10,12 @@ import {
   exportDocument,
   type ExportFormat,
 } from '../../app/exportActions';
+import {
+  MODEL_EXPORT_LABEL,
+  exportModel,
+  type ModelExportFormat,
+} from '../../app/modelExportActions';
+import type { Model3D } from '../../core/model3d/types';
 import { useDocStore } from '../../app/docStore';
 import { Slider } from '../controls/Slider';
 
@@ -24,9 +30,12 @@ const LABELS: Record<ExportFormat, string> = {
 
 export function ExportDialog({ onClose }: { onClose(): void }) {
   const doc = useDocStore((s) => (s.activeId ? s.docs[s.activeId] : null));
+  const model = useDocStore((s) => (s.activeId ? s.models[s.activeId] : null));
   const [opts, setOpts] = useState(() => (doc ? defaultExportOptions(doc) : null));
   const [busy, setBusy] = useState(false);
 
+  // A model document exports model formats instead of image ones (docs/11 §13.3).
+  if (model) return <ModelExportDialog model={model} onClose={onClose} />;
   if (!doc || !opts) return null;
   const patch = (p: Partial<typeof opts>) => setOpts({ ...opts, ...p });
   const lossy = opts.format === 'jpeg' || opts.format === 'webp';
@@ -128,6 +137,74 @@ export function ExportDialog({ onClose }: { onClose(): void }) {
 
       <p className="panel__hint">
         Source: {doc.width} × {doc.height} px
+      </p>
+    </Dialog>
+  );
+}
+
+/** Model documents export geometry formats and camera renders instead (docs/11 §13.3). */
+function ModelExportDialog({ model, onClose }: { model: Model3D; onClose(): void }) {
+  const [format, setFormat] = useState<ModelExportFormat>('java');
+  const [busy, setBusy] = useState(false);
+  const missing = model.missing.length > 0;
+
+  return (
+    <Dialog
+      title={`Export ${model.name}`}
+      onCancel={onClose}
+      confirmLabel={busy ? 'Exporting…' : 'Export'}
+      confirmDisabled={busy}
+      onConfirm={() => {
+        setBusy(true);
+        void exportModel(model, format).then(() => {
+          setBusy(false);
+          onClose();
+        });
+      }}
+    >
+      <label className="field-col">
+        <span className="field-label">Format</span>
+        <select
+          value={format}
+          onChange={(e) => setFormat(e.target.value as ModelExportFormat)}
+          autoFocus
+        >
+          {(Object.keys(MODEL_EXPORT_LABEL) as ModelExportFormat[]).map((f) => (
+            <option key={f} value={f}>
+              {MODEL_EXPORT_LABEL[f]}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      {format === 'java' && (
+        <p className="panel__hint">
+          Minecraft key order and 0–16 numbers. `parent` and any key Monet does not model are
+          preserved, and inherited geometry you have not touched is left inherited.
+        </p>
+      )}
+      {format === 'bedrock' && (
+        <p className="panel__hint">
+          Format 1.12.0, one bone. Bedrock mirrors x and puts the origin at the block’s bottom
+          centre, so coordinates shift and east/west swap — the geometry is converted, not copied.
+        </p>
+      )}
+      {format === 'monet_model' && (
+        <p className="panel__hint">
+          Editable project: elements, groups, UVs, camera and the round-trip baseline. Texture
+          pixels stay in their sources rather than being copied in.
+        </p>
+      )}
+      {format === 'png' && (
+        <p className="panel__hint">
+          The model from the current camera, at the viewport’s size, on transparency — the grid,
+          gizmo and selection highlight are left out, so frame the model and the render is an icon.
+        </p>
+      )}
+
+      <p className="panel__hint">
+        {model.elements.length} element{model.elements.length === 1 ? '' : 's'}
+        {missing ? ` · ${model.missing.length} unresolved reference(s)` : ''}
       </p>
     </Dialog>
   );

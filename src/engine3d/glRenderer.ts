@@ -27,6 +27,8 @@ export interface ModelScene {
   gizmo: { x: number; y: number; z: number } | null;
   /** Inference plane held by the current drag (docs/11 §10.1 item 2), or null. */
   snapLine: { axis: 'x' | 'y' | 'z'; value: number } | null;
+  /** Clear to transparent instead of the surround — render-to-PNG only (§13.3). */
+  transparent?: boolean;
   surround: string; // CSS hex from the theme
   flatShade: boolean;
   grid: boolean;
@@ -100,6 +102,8 @@ export class ModelRenderer {
   private dirty = true;
   private contentDirty = true;
   private lost = false;
+  /** Set only for the duration of a render-to-PNG pass (see readFrame). */
+  private sceneFilter: ((s: ModelScene) => ModelScene) | null = null;
   cssW = 1;
   cssH = 1;
   readonly stats = { frames: 0, totalMs: 0, maxMs: 0, lastMs: 0, rebuilds: 0 };
@@ -129,7 +133,11 @@ export class ModelRenderer {
 
   private initGL() {
     const gl = this.canvas.getContext('webgl2', {
-      alpha: false,
+      // alpha so render-to-PNG can clear transparent (§13.3); normal frames clear opaque, so
+      // page compositing is unchanged. Straight (un-premultiplied) alpha keeps readPixels
+      // values directly usable as PNG bytes.
+      alpha: true,
+      premultipliedAlpha: false,
       antialias: true,
       // Lets the harness read pixels back after the frame — a debug aid, not a hot path.
       preserveDrawingBuffer: true,
@@ -266,6 +274,49 @@ export class ModelRenderer {
     return [px[0], px[1], px[2], px[3]];
   }
 
+  /**
+   * The whole framebuffer as top-down RGBA — render-to-PNG (docs/11 §13.3). The one
+   * legitimate readback (§14): user-initiated and rare. Draws first so what is returned is
+   * the current scene, not whatever the last rAF left behind.
+   *
+   * `clean` (the default) renders the MODEL only, on transparency: no grid, bounds, axes,
+   * gizmo, inference plane, hover highlight or selection tint. An icon must not carry the
+   * editor's furniture, and the selection tint in particular would recolour the whole block.
+   */
+  readFrame(clean = true): { pixels: Uint8ClampedArray; width: number; height: number } | null {
+    const gl = this.gl;
+    if (!gl || this.lost) return null;
+    if (clean) {
+      this.sceneFilter = (s) => ({
+        ...s,
+        grid: false,
+        gizmo: null,
+        snapLine: null,
+        hoverKey: -1,
+        selectedElement: -1,
+        transparent: true,
+      });
+    }
+    try {
+      this.draw();
+    } finally {
+      this.sceneFilter = null;
+    }
+    const w = gl.drawingBufferWidth;
+    const h = gl.drawingBufferHeight;
+    const raw = new Uint8Array(w * h * 4);
+    gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, raw);
+    // GL rows run bottom-up; images run top-down.
+    const pixels = new Uint8ClampedArray(w * h * 4);
+    const stride = w * 4;
+    for (let y = 0; y < h; y++) {
+      pixels.set(raw.subarray((h - 1 - y) * stride, (h - y) * stride), y * stride);
+    }
+    // The viewport is stale now (it holds the clean pass); put the real scene back.
+    if (clean) this.invalidate(false);
+    return { pixels, width: w, height: h };
+  }
+
   // ------------------------------------------------------------------ mesh & textures
 
   private rebuildMesh(model: Model3D) {
@@ -371,10 +422,12 @@ export class ModelRenderer {
 
   private draw() {
     const gl = this.gl!;
-    const scene = this.getScene();
+    const raw = this.getScene();
+    const scene = this.sceneFilter ? this.sceneFilter(raw) : raw;
     const [r, g, b] = hexToRGB(scene.surround);
     gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
-    gl.clearColor(r, g, b, 1);
+    if (scene.transparent) gl.clearColor(0, 0, 0, 0);
+    else gl.clearColor(r, g, b, 1);
     gl.clearDepth(1);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 

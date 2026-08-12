@@ -486,9 +486,14 @@ write, or Save-As — in the format it was read as, **preserving unknown keys** 
 fields survive an edit. Vanilla JSON is written in Minecraft's own key order and 0–16 numbers,
 formatted so a diff against the original stays readable.
 
-**As built (M16, interim):** `Ctrl+S` downloads the model as vanilla JSON (tab-indented, MC key
-order, `#var` faces) — jar sources are read-only anyway, and binding write-back with
-unknown-key preservation is M19's writer work.
+**As built (M19):** `Ctrl+S` downloads the model as vanilla JSON, merged over the SOURCE FILE's
+own JSON, which the document keeps as `raw`: `parent` and every key this build does not model —
+top level, per element (`ModelElement.extra`), per face (`ModelFace.extra`) — are carried
+through verbatim, and only the texture vars the source itself declared are re-declared. A
+`parent`-only model whose geometry was never touched writes back byte-identical: `elements` is
+emitted only when the file HAD its own or the geometry actually changed since load (compared
+against `Model3D.baseline`). Writing to a repo/folder *binding* rather than a download still
+belongs to the source layer — jar sources, the only ones serving models today, are read-only.
 
 ### 13.2 Vanilla legality (the `vanillaMode` flag)
 
@@ -508,6 +513,17 @@ offences in the outliner:
 Java block/item JSON · Bedrock `.geo.json` · `.monet_model` project · plus **render to PNG** from
 the current camera (an isometric icon of the model is a thing people actually need) using the
 existing export pipeline once the framebuffer is read back.
+
+**As built (M19):** the Export dialog swaps its whole body for a model document — the four
+formats above. Bedrock conversion is real, not a re-label: Bedrock's origin is the block's
+bottom centre and its x axis points the other way, so a cube's origin takes `8 − to.x`, east and
+west swap, rotations about y and z negate, and per-face uv becomes texture PIXELS
+(`uv`/`uv_size`) rather than 0..16 units. Geometry, uv and rotation conversion are unit-tested;
+in-game Bedrock verification is not possible in this sandbox and has not been done.
+`.monet_model` is a zip of `manifest.json` + `model.json` + `camera.json`; texture pixels stay
+in their sources rather than being copied in. Render-to-PNG renders the MODEL only — no grid,
+bounds, axes, gizmo, inference plane, hover or selection tint — on **transparency**, so the
+result is an icon rather than a screenshot of the editor.
 
 ---
 
@@ -629,6 +645,13 @@ Java block/item writer preserving unknown keys and key order; Bedrock `.geo.json
 `.monet_model`; display-transform editor with per-slot preview; render-to-PNG.
 **Accept:** read → edit → write a vanilla model and diff cleanly against the original except for
 the intended change; the `gui` display preview matches Minecraft's inventory rendering.
+
+**As built:** the writers, `.monet_model` and render-to-PNG are done and verified by
+`model3d-export.mjs` — a parent-only model reads and writes back identically, and one edited
+number is the only difference after an edit (§13.1). The **display-transform editor is not
+built**: `display` slots parse and survive a save, but there is no per-slot editor or preview, so
+that half of the acceptance line is unmet and tracked as its own item (M19a) rather than being
+claimed here.
 
 ---
 
