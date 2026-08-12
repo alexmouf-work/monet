@@ -224,3 +224,53 @@ describe('.monet_model project file (docs/11 §3)', () => {
     await expect(readMonetModel(new Uint8Array([1, 2, 3]), 'x')).rejects.toThrow(/bad archive/);
   });
 });
+
+describe('display round-trip (docs/11 §10.2)', () => {
+  it('reads Minecraft arrays as vectors and writes them back as arrays', () => {
+    const source: RawJavaModel = {
+      elements: [{ from: [0, 0, 0], to: [16, 16, 16] }],
+      display: { gui: { rotation: [30, 225, 0], scale: [0.625, 0.625, 0.625] } },
+    };
+    const resolved = resolveJavaModel(source, () => null);
+    expect(resolved.display.gui.rotation).toEqual(vec3(30, 225, 0));
+    expect(resolved.display.gui.translation).toBeUndefined();
+
+    const json = JSON.parse(
+      writeJavaModel(
+        model({
+          elements: resolved.elements,
+          display: resolved.display,
+          displayBaseline: JSON.stringify(resolved.display),
+          raw: source as Record<string, unknown>,
+        }),
+      ),
+    ) as RawJavaModel;
+    // Arrays, not {x,y,z}: Minecraft cannot read the object form.
+    expect(json.display).toEqual({ gui: { rotation: [30, 225, 0], scale: [0.625, 0.625, 0.625] } });
+  });
+
+  it('leaves an inherited, untouched slot to the parent but writes an edited one', () => {
+    const inherited = { gui: { rotation: vec3(30, 225, 0) } };
+    const base = model({
+      raw: { parent: 'minecraft:block/cube_all' } as Record<string, unknown>,
+      display: inherited,
+      displayBaseline: JSON.stringify(inherited),
+    });
+    expect(JSON.parse(writeJavaModel(base)).display).toBeUndefined();
+
+    const edited = model({
+      raw: { parent: 'minecraft:block/cube_all' } as Record<string, unknown>,
+      display: { gui: { rotation: vec3(30, 180, 0) } },
+      displayBaseline: JSON.stringify(inherited),
+    });
+    expect(JSON.parse(writeJavaModel(edited)).display).toEqual({ gui: { rotation: [30, 180, 0] } });
+  });
+
+  it('drops a slot the source declared once the model clears it', () => {
+    const m = model({
+      raw: { display: { gui: { scale: [1, 1, 1] } } } as unknown as Record<string, unknown>,
+      display: undefined,
+    });
+    expect(JSON.parse(writeJavaModel(m)).display).toBeUndefined();
+  });
+});

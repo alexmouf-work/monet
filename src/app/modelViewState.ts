@@ -5,7 +5,7 @@
  * `sceneHooks` mid-evaluation and TDZ-crashed the whole boot ("Cannot access 'painters'
  * before initialization").
  */
-import type { FaceHit } from '../core/model3d/types';
+import type { DisplaySlotName, FaceHit } from '../core/model3d/types';
 import type { ModelRenderer } from '../engine3d/glRenderer';
 
 let hover: FaceHit | null = null;
@@ -34,6 +34,15 @@ export function subscribeModelHover(fn: () => void): () => void {
 let renderer: ModelRenderer | null = null;
 export const setModelRenderer = (r: ModelRenderer | null): void => void (renderer = r);
 export const modelRenderer = (): ModelRenderer | null => renderer;
+
+/**
+ * The `display` slot being previewed, or null (docs/11 §10.2). Lives here rather than with the
+ * workspace's other view prefs so `debugBridge` can read it without importing any ui module —
+ * the leaf-module rule in ARCHITECTURE.
+ */
+let previewSlot: DisplaySlotName | null = null;
+export const setDisplayPreview = (slot: DisplaySlotName | null): void => void (previewSlot = slot);
+export const displayPreview = (): DisplaySlotName | null => previewSlot;
 
 /** Live gizmo-drag readout (docs/11 §10.1 item 4) — the status bar renders it. */
 export interface DragReadout {

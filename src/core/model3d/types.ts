@@ -109,6 +109,8 @@ export interface Model3D {
   raw?: Record<string, unknown>;
   /** JSON of the elements as loaded: unchanged + inherited geometry needs no `elements` out. */
   baseline?: string;
+  /** JSON of `display` as loaded — an inherited, untouched slot is not the child's to declare. */
+  displayBaseline?: string;
   camera: CameraState;
   vanillaMode: boolean;
   nextItemId: number;

@@ -29,6 +29,11 @@ export interface ModelScene {
   snapLine: { axis: 'x' | 'y' | 'z'; value: number } | null;
   /** Clear to transparent instead of the surround — render-to-PNG only (§13.3). */
   transparent?: boolean;
+  /**
+   * Extra model transform for the MESH only — a `display` slot preview (docs/11 §10.2). The
+   * grid, bounds and axes stay in world space: they are what the model is being moved against.
+   */
+  modelMatrix?: Float32Array | null;
   surround: string; // CSS hex from the theme
   flatShade: boolean;
   grid: boolean;
@@ -440,7 +445,9 @@ export class ModelRenderer {
     }
 
     const aspect = this.cssW / Math.max(1, this.cssH);
-    const mvp = multiply(projMatrix(scene.camera, aspect), viewMatrix(scene.camera));
+    const vp = multiply(projMatrix(scene.camera, aspect), viewMatrix(scene.camera));
+    // Furniture and gizmos use the view-projection; the mesh may carry a display transform.
+    const mvp = scene.modelMatrix ? multiply(vp, scene.modelMatrix) : vp;
 
     gl.enable(gl.DEPTH_TEST);
     gl.depthFunc(gl.LEQUAL);
@@ -448,7 +455,7 @@ export class ModelRenderer {
     // Furniture first (no cull): grid, block bounds, axes.
     if (scene.grid) {
       gl.useProgram(this.lineProgram);
-      gl.uniformMatrix4fv(gl.getUniformLocation(this.lineProgram, 'uMVP'), false, mvp);
+      gl.uniformMatrix4fv(gl.getUniformLocation(this.lineProgram, 'uMVP'), false, vp);
       gl.bindVertexArray(this.lineVAO);
       const color = gl.getUniformLocation(this.lineProgram, 'uColor');
       const { grid, bounds } = this.lineCounts;
@@ -492,10 +499,10 @@ export class ModelRenderer {
     gl.disable(gl.CULL_FACE);
 
     // Translate gizmo: three axis segments through the depth buffer (always visible).
-    if (scene.gizmo) {
+    if (scene.gizmo && !scene.modelMatrix) {
       gl.disable(gl.DEPTH_TEST);
       gl.useProgram(this.lineProgram);
-      gl.uniformMatrix4fv(gl.getUniformLocation(this.lineProgram, 'uMVP'), false, mvp);
+      gl.uniformMatrix4fv(gl.getUniformLocation(this.lineProgram, 'uMVP'), false, vp);
       const g = scene.gizmo;
       const buf = gl.createBuffer()!;
       gl.bindBuffer(gl.ARRAY_BUFFER, buf);
@@ -543,7 +550,7 @@ export class ModelRenderer {
     if (scene.snapLine) {
       gl.disable(gl.DEPTH_TEST);
       gl.useProgram(this.lineProgram);
-      gl.uniformMatrix4fv(gl.getUniformLocation(this.lineProgram, 'uMVP'), false, mvp);
+      gl.uniformMatrix4fv(gl.getUniformLocation(this.lineProgram, 'uMVP'), false, vp);
       const { axis, value: v } = scene.snapLine;
       const lo = -4;
       const hi = 20;

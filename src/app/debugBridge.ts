@@ -12,7 +12,8 @@ import { useViewStore } from './viewStore';
 import { useSettingsStore } from './settingsStore';
 import { compositePixels } from '../engine/compose';
 import { activeRenderer } from '../engine/renderer';
-import { modelHover, modelRenderer } from './modelViewState';
+import { displayPreview, modelHover, modelRenderer } from './modelViewState';
+import { displayMatrix, effectiveSlot } from '../core/model3d/display';
 import { projMatrix, viewMatrix } from '../core/model3d/camera';
 import { multiply, transformPoint } from '../core/model3d/vec';
 import { getComposeOpts } from '../ui/sceneHooks';
@@ -39,6 +40,8 @@ export interface MonetDebug {
   modelCenterPixel(): number[] | null;
   /** A clean render-to-PNG pass as plain arrays — what an exported icon contains (§13.3). */
   modelFrame(): { pixels: number[]; width: number; height: number } | null;
+  /** A model point through the previewed display slot's matrix, or null when not previewing. */
+  displayPreviewPoint(x: number, y: number, z: number): { x: number; y: number; z: number } | null;
 }
 
 export function installDebugBridge(): void {
@@ -168,6 +171,8 @@ export function installDebugBridge(): void {
               v: Math.round(modelHover()!.uvNorm.v * 1000) / 1000,
             }
           : null,
+        display: m.display,
+        displayPreview: displayPreview(),
         // Selection depth (docs/11 §10.1 item 3): element, then face, then nothing.
         selected: {
           element: useDocStore.getState().selectedElementId,
@@ -182,6 +187,12 @@ export function installDebugBridge(): void {
     modelFrame() {
       const frame = modelRenderer()?.readFrame();
       return frame ? { ...frame, pixels: Array.from(frame.pixels) } : null;
+    },
+    displayPreviewPoint(x, y, z) {
+      const slot = displayPreview();
+      const m = useDocStore.getState().activeModel();
+      if (!slot || !m) return null;
+      return transformPoint(displayMatrix(effectiveSlot(slot, m.display)), { x, y, z });
     },
     modelElements() {
       const m = useDocStore.getState().activeModel();

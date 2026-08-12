@@ -6,16 +6,16 @@ numbered spec (`docs/00`–`docs/10`) — do not duplicate it here; describe rea
 
 ## State: v1 complete (2026-08-09, M0–M12), plus owner requests since
 
-Every feature in `docs/00 §3` is implemented and exercised in a real browser. 183 unit tests
+Every feature in `docs/00 §3` is implemented and exercised in a real browser. 193 unit tests
 (`src/core` plus the pure GitHub OAuth helpers); behaviour verified by harness scenarios (below).
 
-**3D model mode** (`docs/11-3d-model-mode.md`): M13 (viewport), M14 (face→texture + live link),
-M15 (painting on the model), M16 (modelling: element CRUD, numeric properties, translate gizmo,
-vanilla validation, JSON writer), M17 (UV editing: box-UV, per-face rects/rotation/mirror, the UV
-tab over the live texture), M18 (inference snapping, measurement, depth cycling, context menus)
-and M19 (round-trip writers, Bedrock geometry, `.monet_model`, render-to-PNG) are built.
-Outstanding: the display-slot editor + preview, M18's selection filters and multi-select
-transforms (ROADMAP M19a and the M18 row).
+**3D model mode** (`docs/11-3d-model-mode.md`) is complete through M19a: M13 viewport, M14
+face→texture + live link, M15 painting on the model, M16 modelling (element CRUD, numeric
+properties, translate gizmo, vanilla validation), M17 UV editing (box-UV, per-face
+rects/rotation/mirror, the UV tab over the live texture), M18 Onshape interaction (inference
+snapping, measurement, depth cycling, context menus), M19 export/round-trip (source-merged Java
+writer, Bedrock geometry, `.monet_model`, icon renders) and M19a display slots + preview.
+Outstanding: M18's selection filters and multi-select transforms.
 
 ## Tree
 
@@ -54,6 +54,7 @@ src/core/model3d/                      PURE 3D: types, vec/mat4, orbit camera, j
   monetModelFile.ts                    .monet_model zip: manifest + model + camera (no pixels)
   uv.ts                                box-UV cross, mirror = endpoint swap, fit = vanilla projection
   infer.ts                             alignment inference on a drag axis; box gaps (measurement)
+  display.ts                           display slots → model matrix + vanilla per-slot defaults
 
 src/engine3d/glRenderer.ts             raw WebGL2 viewport (D11.1): mesh+line programs,
                                        NEAREST textures, frontFace(CW), context-loss rebuild
@@ -87,7 +88,7 @@ src/app/                               stores + action layer
                                        context menu share one undoable route per edit
   modelExportActions.ts                java / bedrock / .monet_model / render-to-PNG downloads
   modelViewState.ts overlayRegistry.ts leaf modules: hover/renderer registry, overlay painters,
-                                       live gizmo-drag readout
+                                       live gizmo-drag readout, previewed display slot
   launchFiles.ts                       OS "open with" launches → docs bound to their handles
   installPrompt.ts                     beforeinstallprompt capture (installing enables that)
   autosave.ts debugBridge.ts
@@ -136,7 +137,8 @@ segmentation, cross-history undo order) · `model3d-edit` (M16: the stool build 
 duplicate/mirror, gizmo snapping, vanillaMode, JSON save) · `model3d-uv` (M17: box-UV on a
 64×32 sheet, fill-lands-in-rect, face editors, rect dragging) · `model3d-snap` (M18: fractional
 inference alignment, measurement, depth cycling, context menus) · `model3d-export` (M19: clean
-Java round-trip, Bedrock conversion, project zip, icon render). Fixture jars are built fresh each run by
+Java round-trip, Bedrock conversion, project zip, icon render) · `model3d-display` (M19a: slot
+preview matrices, paused editing, slot edit → saved JSON). Fixture jars are built fresh each run by
 `tests/manual/fixtures/jar.mjs` (Node-side zip + hand-rolled PNG encoder) — nothing depends on
 leftover /tmp files. The harness launches Chromium with swiftshader flags so WebGL2 works
 headless.
@@ -322,6 +324,11 @@ submission, not GPU rasterisation.
 - `Ctrl+S`/`Ctrl+Shift+S`/`Ctrl+Shift+E` are the only chords allowed to fire while a text or
   numeric field has focus: no field claims them, and suppressing them made saving after typing a
   value do nothing at all.
+- Minecraft's `display` slots are `[x, y, z]` ARRAYS on disk and vectors in memory; convert at
+  both ends (`javaModel` in, `javaModelWriter` out). Writing the in-memory shape produces a file
+  Minecraft cannot read.
+- Previewing a display slot transforms only the MESH, so the CPU pick geometry no longer matches
+  the screen: picking, painting and the gizmo must stand down for the duration (they do).
 - The clipboard holds either pixels or an object. When both could apply, the system clipboard
   wins **unless** its bytes are the PNG we last wrote — that is our own object copy returning.
 - The text editing overlay commits on a real outside click, not on blur: the pointer-up that

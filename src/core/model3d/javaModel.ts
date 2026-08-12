@@ -7,7 +7,7 @@
  * parent's entirely; `textures` merge with the child winning; `display` merges per slot.
  * `#var` chains resolve to a fixed point with a cycle guard.
  */
-import type { Face, ModelElement, ModelFace, Vec3 } from './types';
+import type { DisplaySlot, Face, ModelElement, ModelFace, Vec3 } from './types';
 import { FACES, vec3 } from './types';
 
 /** The raw JSON shape of a Java model file — everything optional, everything untrusted. */
@@ -64,7 +64,8 @@ export interface ResolvedJavaModel {
   elements: ModelElement[];
   /** var → fully-qualified texture ref (`minecraft:block/stone`) or `#…` when unresolved. */
   textures: Record<string, string>;
-  display: Record<string, unknown>;
+  /** Slot name → transform, with Minecraft's arrays turned into vectors. */
+  display: Record<string, DisplaySlot>;
   ambientocclusion: boolean;
   guiLight?: 'front' | 'side';
   /** Ancestor refs, child first. */
@@ -135,13 +136,13 @@ export function resolveJavaModel(
 
   // Merge child-wins: walk root-most first so nearer models overwrite.
   const textures: Record<string, string> = {};
-  const display: Record<string, unknown> = {};
+  const rawDisplay: Record<string, unknown> = {};
   let elements: RawElement[] | undefined;
   let ambientocclusion = true;
   let guiLight: 'front' | 'side' | undefined;
   for (const model of [...chain].reverse()) {
     if (model.textures) Object.assign(textures, model.textures);
-    if (model.display) Object.assign(display, model.display);
+    if (model.display) Object.assign(rawDisplay, model.display);
     if (model.elements) elements = model.elements; // replace, never merge
     if (model.ambientocclusion !== undefined) ambientocclusion = model.ambientocclusion;
     if (model.gui_light === 'front' || model.gui_light === 'side') guiLight = model.gui_light;
@@ -164,7 +165,7 @@ export function resolveJavaModel(
   return {
     elements: (elements ?? []).map((raw, i) => normalizeElement(raw, i + 1)),
     textures: resolvedTextures,
-    display,
+    display: normalizeDisplay(rawDisplay),
     ambientocclusion,
     guiLight,
     parentChain,
@@ -237,4 +238,31 @@ export function defaultUV(face: Face, from: Vec3, to: Vec3): [number, number, nu
     case 'east':
       return [16 - to.z, 16 - to.y, 16 - from.z, 16 - from.y];
   }
+}
+
+/**
+ * `display` as Minecraft writes it — `[x, y, z]` arrays per part — turned into vectors, which
+ * is the only shape the rest of the app handles (docs/11 §10.2). Slots whose parts are missing
+ * stay missing so `effectiveSlot` can fall back to the vanilla default per field. Unknown
+ * shapes are skipped rather than guessed; the writer still carries the original through.
+ */
+function normalizeDisplay(raw: Record<string, unknown>): Record<string, DisplaySlot> {
+  const out: Record<string, DisplaySlot> = {};
+  for (const [name, value] of Object.entries(raw)) {
+    if (!value || typeof value !== 'object') continue;
+    const v = value as Record<string, unknown>;
+    const part = (key: string): Vec3 | undefined => {
+      const a = v[key];
+      return Array.isArray(a) && a.length >= 3
+        ? vec3(Number(a[0]) || 0, Number(a[1]) || 0, Number(a[2]) || 0)
+        : undefined;
+    };
+    const slot: DisplaySlot = {
+      rotation: part('rotation'),
+      translation: part('translation'),
+      scale: part('scale'),
+    };
+    if (slot.rotation || slot.translation || slot.scale) out[name] = slot;
+  }
+  return out;
 }

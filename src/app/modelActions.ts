@@ -171,11 +171,12 @@ export async function openModelFromSource(source: SourceProvider, path: string):
       missing: [...resolved.missing, ...missingTextures],
       ambientocclusion: resolved.ambientocclusion,
       guiLight: resolved.guiLight,
-      display: resolved.display as Model3D['display'],
+      display: Object.keys(resolved.display).length ? resolved.display : undefined,
       // Round-trip baseline (docs/11 §13.1): the file's OWN json plus the geometry as loaded,
       // so a save preserves `parent`/unknown keys and skips inherited, untouched `elements`.
       raw: root as Record<string, unknown>,
       baseline: elementsSignature(resolved.generated ? generatedElements() : resolved.elements),
+      displayBaseline: JSON.stringify(resolved.display),
       camera: frame(DEFAULT_CAMERA, ...boundsOf(resolved)),
       vanillaMode: true,
       nextItemId: resolved.elements.length + 1,

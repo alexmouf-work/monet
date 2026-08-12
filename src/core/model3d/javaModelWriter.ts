@@ -101,7 +101,31 @@ export function writeJavaModel(model: Model3D): string {
     out.elements = model.elements.map(elementJSON);
   }
 
-  if (model.display && Object.keys(model.display).length) out.display = model.display;
+  // `display` goes out as Minecraft's [x, y, z] arrays (it cannot read {x,y,z} objects), with
+  // the source's own display kept underneath so slots or keys this build ignores survive. A
+  // slot that is only INHERITED and untouched stays the parent's, exactly like texture vars.
+  const ownSlots = (raw.display ?? {}) as Record<string, unknown>;
+  const loaded = model.displayBaseline
+    ? (JSON.parse(model.displayBaseline) as Record<string, unknown>)
+    : null;
+  const display: Record<string, unknown> = { ...ownSlots };
+  for (const [slot, value] of Object.entries(model.display ?? {})) {
+    const inherited =
+      !(slot in ownSlots) &&
+      loaded !== null &&
+      JSON.stringify(loaded[slot]) === JSON.stringify(value);
+    if (inherited) continue;
+    const parts: Record<string, number[]> = {};
+    if (value.rotation) parts.rotation = vec(value.rotation);
+    if (value.translation) parts.translation = vec(value.translation);
+    if (value.scale) parts.scale = vec(value.scale);
+    display[slot] = { ...((display[slot] as Record<string, unknown>) ?? {}), ...parts };
+  }
+  // A slot the model dropped must not come back from `raw`.
+  for (const slot of Object.keys(display)) {
+    if (slot in ownSlots && !(model.display ?? {})[slot]) delete display[slot];
+  }
+  if (Object.keys(display).length) out.display = display;
 
   return `${JSON.stringify(out, null, '\t')}\n`;
 }

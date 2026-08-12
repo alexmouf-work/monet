@@ -419,6 +419,12 @@ Display transforms: the `display` slots (gui, head, thirdperson_*, firstperson_*
 with a preview that renders the model exactly as Minecraft would in that context — the fastest way
 to catch a model that looks right in the editor and wrong in hand.
 
+**As built (M19a):** `display` is stored with vectors (`{x,y,z}`) and read/written as Minecraft's
+`[x, y, z]` arrays — the object form is not something Minecraft can load, and mixing the two was
+a real bug the harness caught. A slot that is only inherited and untouched is left to the parent
+rather than copied into the child, the same rule as texture variables (§13.1), tracked with a
+`displayBaseline` alongside the element baseline.
+
 ---
 
 ## 11. UI: the same shell, different sections
@@ -646,12 +652,16 @@ Java block/item writer preserving unknown keys and key order; Bedrock `.geo.json
 **Accept:** read → edit → write a vanilla model and diff cleanly against the original except for
 the intended change; the `gui` display preview matches Minecraft's inventory rendering.
 
-**As built:** the writers, `.monet_model` and render-to-PNG are done and verified by
-`model3d-export.mjs` — a parent-only model reads and writes back identically, and one edited
-number is the only difference after an edit (§13.1). The **display-transform editor is not
-built**: `display` slots parse and survive a save, but there is no per-slot editor or preview, so
-that half of the acceptance line is unmet and tracked as its own item (M19a) rather than being
-claimed here.
+**As built:** the writers, `.monet_model` and render-to-PNG are verified by `model3d-export.mjs`
+— a parent-only model reads and writes back identically, and one edited number is the only
+difference after an edit (§13.1). The display editor is the Model tab's **Display** section:
+eight slot chips, numeric rotate/move/scale (arithmetic, Minecraft's ±80 and ≤4 clamps), Reset
+back to inherited, and **Preview**, which draws the mesh through that slot's matrix — grid,
+bounds and axes stay in world space as the reference. An undeclared slot shows vanilla's own
+default, so the preview matches Minecraft before anything is typed. While previewing, picking,
+painting and the gizmo stand down: the CPU pick geometry is untransformed, so any hit would be a
+lie. Verified by `model3d-display.mjs`, including the exact `fixed` matrix (corner 16 → 12) and
+that a slot edit is one undo step that reaches the saved JSON.
 
 ---
 

@@ -3,7 +3,7 @@
  * mutation goes through docStore.executeModel, so history, the dirty flag and the
  * "reopen any parameter forever" promise all hold.
  */
-import type { Model3D, ModelElement } from './types';
+import type { DisplaySlot, DisplaySlotName, Model3D, ModelElement } from './types';
 
 export interface ModelCommand {
   label: string;
@@ -82,5 +82,36 @@ export class PatchElementCommand implements ModelCommand {
   }
   undo(m: Model3D) {
     this.swap(m, this.before);
+  }
+}
+
+/**
+ * One `display` slot's transform (docs/11 §10.2). Model-level rather than per element, so it
+ * carries its own before/after instead of reusing PatchElementCommand.
+ */
+export class SetDisplayCommand implements ModelCommand {
+  private before: DisplaySlot | undefined;
+  private after: DisplaySlot | undefined;
+  constructor(
+    public label: string,
+    m: Model3D,
+    private slot: DisplaySlotName,
+    after: DisplaySlot | undefined,
+  ) {
+    const current = m.display?.[this.slot];
+    this.before = current ? (JSON.parse(JSON.stringify(current)) as DisplaySlot) : undefined;
+    this.after = after ? (JSON.parse(JSON.stringify(after)) as DisplaySlot) : undefined;
+  }
+  private set(m: Model3D, value: DisplaySlot | undefined) {
+    const display = { ...(m.display ?? {}) };
+    if (value) display[this.slot] = JSON.parse(JSON.stringify(value)) as DisplaySlot;
+    else delete display[this.slot];
+    m.display = Object.keys(display).length ? display : undefined;
+  }
+  do(m: Model3D) {
+    this.set(m, this.after);
+  }
+  undo(m: Model3D) {
+    this.set(m, this.before);
   }
 }

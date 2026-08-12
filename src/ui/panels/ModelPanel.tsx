@@ -6,7 +6,7 @@
 import { useState } from 'react';
 import { useDocStore } from '../../app/docStore';
 import { invalidate } from '../../app/bus';
-import { PatchElementCommand } from '../../core/model3d/commands';
+import { PatchElementCommand, SetDisplayCommand } from '../../core/model3d/commands';
 import {
   addCube,
   deleteSelectedElement,
@@ -14,8 +14,16 @@ import {
   mirrorSelectedElement,
 } from '../../app/modelEditActions';
 import { snapLegalAngle, validateModel } from '../../core/model3d/validate';
-import type { Axis, ModelElement } from '../../core/model3d/types';
+import {
+  DISPLAY_SLOTS,
+  type Axis,
+  type DisplaySlot,
+  type DisplaySlotName,
+  type ModelElement,
+} from '../../core/model3d/types';
+import { DISPLAY_LABEL, effectiveSlot } from '../../core/model3d/display';
 import { frameModel, snapView, updateCamera, viewPrefs } from '../ModelWorkspace';
+import { displayPreview, setDisplayPreview } from '../../app/modelViewState';
 import { NumField } from '../controls/NumField';
 
 export function ModelPanel() {
@@ -297,10 +305,123 @@ export function ModelPanel() {
         </div>
       )}
 
+      <DisplaySection />
+
       <p className="panel__hint">
         Click an element to select it; drag its axis arrows to move (⇧ = ½ steps, Alt = free).
         Fields take arithmetic: 8+2, 16/3.
       </p>
+    </div>
+  );
+}
+
+/**
+ * Display transforms — docs/11 §10.2. The eight slots Minecraft honours, each a
+ * rotation/translation/scale it applies when the model is held, worn, dropped or drawn in the
+ * inventory. Preview draws the model through the slot's matrix, so "looks right in the editor,
+ * wrong in hand" is catchable here. A slot the model does not declare shows vanilla's own
+ * default, and editing it writes the slot for real.
+ */
+function DisplaySection() {
+  const doc = useDocStore((s) => (s.activeId ? s.models[s.activeId] : null));
+  useDocStore((s) => s.rev);
+  const [slot, setSlot] = useState<DisplaySlotName>('gui');
+  const [, force] = useState(0);
+  if (!doc) return null;
+
+  const ds = useDocStore.getState();
+  const declared = doc.display?.[slot];
+  const value = effectiveSlot(slot, doc.display);
+  const previewing = displayPreview() === slot;
+
+  const repaint = () => {
+    invalidate(false);
+    force((n) => n + 1);
+  };
+
+  /** Commit the slot through the command system; `undefined` clears it back to inherited. */
+  const commit = (label: string, next: DisplaySlot | undefined) => {
+    ds.executeModel(new SetDisplayCommand(label, doc, slot, next));
+    repaint();
+  };
+
+  const setPart = (part: 'rotation' | 'translation' | 'scale', axis: Axis) => (v: number) => {
+    const next = JSON.parse(JSON.stringify(value)) as Required<DisplaySlot>;
+    next[part][axis] = v;
+    commit(`${DISPLAY_LABEL[slot]} ${part} ${axis}`, next);
+  };
+
+  const row = (label: string, part: 'rotation' | 'translation' | 'scale') => (
+    <div className="field-row" key={part}>
+      <span className="field-label">{label}</span>
+      {(['x', 'y', 'z'] as const).map((axis) => (
+        <NumField
+          key={axis}
+          label={axis}
+          value={value[part]![axis]}
+          onCommit={setPart(part, axis)}
+        />
+      ))}
+    </div>
+  );
+
+  return (
+    <div className="panel__section">
+      <div className="field-row">
+        <span className="field-label">Display</span>
+        <div className="segmented">
+          {DISPLAY_SLOTS.map((s) => (
+            <button
+              key={s}
+              className={s === slot ? 'is-active' : ''}
+              style={doc.display?.[s] ? undefined : { opacity: 0.55 }}
+              title={`${s}${doc.display?.[s] ? '' : ' (inheriting vanilla’s default)'}`}
+              onClick={() => {
+                setSlot(s);
+                if (displayPreview()) setDisplayPreview(s);
+                repaint();
+              }}
+            >
+              {DISPLAY_LABEL[s]}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {row('Rotate', 'rotation')}
+      {row('Move', 'translation')}
+      {row('Scale', 'scale')}
+
+      <div className="field-row">
+        <button
+          className={`btn ${previewing ? 'is-active' : ''}`}
+          onClick={() => {
+            setDisplayPreview(previewing ? null : slot);
+            repaint();
+          }}
+          title="Draw the model as Minecraft would in this slot"
+        >
+          {previewing ? '◉ Previewing' : '▷ Preview'}
+        </button>
+        <button
+          className="btn"
+          disabled={!declared}
+          onClick={() => commit(`Clear ${DISPLAY_LABEL[slot]} display`, undefined)}
+          title="Remove this slot so the parent’s (or vanilla’s) values apply again"
+        >
+          Reset
+        </button>
+        <span className="panel__hint" style={{ margin: 0 }}>
+          {declared ? 'set on this model' : 'inherited'}
+        </span>
+      </div>
+
+      {previewing && (
+        <p className="panel__hint panel__hint--warn">
+          Previewing {slot}: the model is drawn through the slot transform, so picking, painting and
+          the gizmo are paused. Translations are 1/16 blocks (±80), scale caps at 4.
+        </p>
+      )}
     </div>
   );
 }

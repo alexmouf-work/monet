@@ -32,6 +32,7 @@ interface ModelPart {
   guiLight?: Model3D['guiLight'];
   raw?: Record<string, unknown>;
   baseline?: string;
+  displayBaseline?: string;
 }
 
 export async function writeMonetModel(model: Model3D): Promise<Uint8Array> {
@@ -54,6 +55,7 @@ export async function writeMonetModel(model: Model3D): Promise<Uint8Array> {
     guiLight: model.guiLight,
     raw: model.raw,
     baseline: model.baseline,
+    displayBaseline: model.displayBaseline,
   };
   zip.file('manifest.json', JSON.stringify(manifest, null, 2));
   zip.file('model.json', JSON.stringify(part, null, 2));
@@ -125,6 +127,7 @@ export async function readMonetModel(bytes: Uint8Array, id: string): Promise<Mod
     display: part.display,
     raw: part.raw,
     baseline: part.baseline,
+    displayBaseline: part.displayBaseline,
     camera,
     vanillaMode: manifest.vanillaMode ?? true,
     nextItemId: Math.max(Number(manifest.nextItemId) || 1, maxId + 1),

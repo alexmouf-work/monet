@@ -34,11 +34,13 @@ import {
 import { multiply, transformPoint } from '../core/model3d/vec';
 import { PatchElementCommand } from '../core/model3d/commands';
 import type { Axis, ModelElement, Vec3 } from '../core/model3d/types';
+import { displayMatrix, effectiveSlot } from '../core/model3d/display';
 import { modelBounds } from '../core/model3d/geometry';
 import { faceKey } from '../core/model3d/geometry';
 import { pickModel } from '../core/model3d/pick';
 import type { FaceHit, Model3D } from '../core/model3d/types';
 import {
+  displayPreview,
   modelHover as hoverNow,
   modelRenderer as rendererNow,
   reportDragReadout,
@@ -58,6 +60,13 @@ import { isTypingTarget } from './Workspace';
 
 /** 3D view prefs shared with panels; module state — no store ceremony needed yet. */
 export const viewPrefs = { flatShade: false, grid: true };
+
+/**
+ * A previewed `display` slot (docs/11 §10.2) draws the mesh through that slot's matrix, which
+ * means the CPU pick geometry no longer matches what is on screen — so picking, painting and
+ * the gizmo all stand down for the duration. The slot itself lives in app/modelViewState.
+ */
+export { displayPreview, setDisplayPreview } from '../app/modelViewState';
 
 // Hover + renderer registry live in app/modelViewState (no ui imports) so debugBridge can
 // read them without dragging the ui module graph into its import chain.
@@ -170,6 +179,9 @@ export function ModelWorkspace() {
         surround: themeColors().surround,
         flatShade: viewPrefs.flatShade,
         grid: viewPrefs.grid,
+        modelMatrix: displayPreview()
+          ? displayMatrix(effectiveSlot(displayPreview()!, model?.display))
+          : null,
       };
     };
 
@@ -240,7 +252,8 @@ export function ModelWorkspace() {
       const ds = useDocStore.getState();
       const model = ds.activeModel();
       const el = model?.elements.find((x) => x.id === ds.selectedElementId);
-      if (!model || !el || useToolStore.getState().active !== 'select') return null;
+      if (!model || !el || displayPreview()) return null;
+      if (useToolStore.getState().active !== 'select') return null;
       const origin = elementCentre(el);
       const o = toScreen(origin);
       if (!o) return null;
@@ -274,6 +287,9 @@ export function ModelWorkspace() {
     };
 
     const hitAt = (e: PointerEvent) => {
+      // While a display slot is previewed the mesh is transformed but pick geometry is not,
+      // so every hit would be a lie: report nothing and let the drag orbit (docs/11 §10.2).
+      if (displayPreview()) return null;
       const model = useDocStore.getState().activeModel();
       const ray = rayAt(e);
       return model && ray ? pickModel(model.elements, ray) : null;
@@ -365,6 +381,10 @@ export function ModelWorkspace() {
         return;
       }
       // Hover pick, rAF-coalesced; the ray cast is microseconds (docs/11 §7).
+      if (displayPreview()) {
+        reportHover(null);
+        return;
+      }
       const model = useDocStore.getState().activeModel();
       const ray = rayAt(e);
       reportHover(model && ray ? pickModel(model.elements, ray) : null);
@@ -438,7 +458,7 @@ export function ModelWorkspace() {
 
     const onDoubleClick = (e: MouseEvent) => {
       const model = useDocStore.getState().activeModel();
-      if (!model) return;
+      if (!model || displayPreview()) return;
       const ray = rayAt(e as unknown as PointerEvent);
       const hit = ray ? pickModel(model.elements, ray) : null;
       if (hit) void openFaceTexture(model, hit);

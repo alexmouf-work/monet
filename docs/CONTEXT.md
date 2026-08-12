@@ -10,9 +10,10 @@ Full feature inventory (the contract): `docs/00-overview.md` §3.
 Exclusions (do not build): §4 — stickers, magic select, extra Paint 3D brushes, lasso
 select, effects beyond noise/recolour, animation/mcmeta editing, collaboration.
 **"3D anything" and "any server component" no longer apply** — see the superseded table.
-3D model mode: spec `docs/11-3d-model-mode.md`; M13–M19 built (viewport, face→texture, painting,
-modelling, UV editing, Onshape interaction, export/round-trip). Outstanding: the display-slot
-editor + preview (ROADMAP M19a), and M18's selection filters / multi-select transforms.
+3D model mode: spec `docs/11-3d-model-mode.md`; **M13–M19 + M19a all built** (viewport,
+face→texture, painting, modelling, UV editing, Onshape interaction, export/round-trip, display
+slots). Outstanding: M18's selection filters and multi-select transforms; seam-aware painting
+(§8.4, out of scope by decision); dirty-rect texture uploads (fine at MC texture sizes).
 
 ## Durable owner decisions
 
@@ -47,6 +48,7 @@ browser. See docs/ARCHITECTURE.md for the as-built map and ROADMAP.csv for per-m
 | ---- | ---- |
 | 2026-08-09 | v1 technical specification, docs/00–10 (commit 081e6de). |
 | 2026-08-09 | Charter + progress-docs system (this governance layer). |
+| 2026-08-11 | **M19a — display transforms**: a Display section on the Model tab edits the eight `display` slots numerically and previews each one by drawing the model through Minecraft's own transform for that slot (vanilla defaults shown for slots the model has not declared), so "right in the editor, wrong in hand" is catchable; editing is paused during a preview, and a slot edit is one undo step that reaches the saved JSON. |
 | 2026-08-11 | **M19 — export and round-trip**: saving a model merges over the source file, so `parent`, unknown mod keys and inherited-but-untouched geometry all survive (a parent-only model saves byte-identical); the Export dialog offers Java JSON, Bedrock `.geo.json` (real coordinate conversion, unit-tested but not verified in-game), the `.monet_model` project, and render-to-PNG — model only, on transparency, so it is an icon. Display slots round-trip but have no editor yet (ROADMAP M19a). |
 | 2026-08-11 | **M18 — Onshape interaction**: gizmo drags infer alignments against other elements' faces and centres (reaching fractional coordinates the lattice cannot), drawing the aligned plane and a live Δaxis readout; the status bar measures the gap between the selected and hovered elements in texels; clicking cycles selection depth element→face with Esc climbing out; right-click opens a content-aware context menu. Selection filters, multi-select transforms and view-cube refinements are deferred. |
 | 2026-08-11 | **M17 — UV editing**: a UV tab (models only) with per-face rects as numeric fields, box-UV auto-mapping (classic cross, texel origin, one undo step), 90° rotation cycling, mirror by endpoint swap, fit-to-face (vanilla projection), copy/paste UV, face on/off, and a live-texture canvas where rects drag/resize on the texel lattice. |
