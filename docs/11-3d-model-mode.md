@@ -469,6 +469,7 @@ disabled — they reappear the moment a texture document is focused, which is on
 | `Tab` | cycle selection depth (group → element → face) |
 | `Alt` (hold) | disable snapping · `Shift` (hold) | fine snap |
 | `Esc` | climb out one selection level (M18: face → element → nothing) |
+| `Ctrl`/`⇧`+click | add or remove an element · `Ctrl+A` all elements · drag empty space = box-select |
 | `B` `M` `E` `F` `I` | brushes, unchanged — they paint on the model |
 
 `G` is currently unbound in 2D; `N` and `Enter` are free. Nothing in the 2D map changes.
@@ -642,9 +643,17 @@ element → nothing); the face selection is `docStore.selectedFace`, which the U
 Right-click opens a context menu — element ops plus that face's texture when over geometry, add
 cube and the view presets over empty space — while right-DRAG stays the orbit alias.
 Verified by `model3d-snap.mjs`: a cube aligns to a neighbour's face at x = 5.7, a coordinate the
-integer lattice cannot produce, by dragging alone. **Not built:** selection *filters*
-(box-select restricted to faces), multi-select transforms, and view-cube refinements — the
-single-selection ladder covers the acceptance case; deferred rather than half-built.
+integer lattice cannot produce, by dragging alone.
+
+Multi-select came with the same layer: Ctrl/⇧-click toggles an element, a drag from empty space
+box-selects (a drag that starts on geometry orbits — only a manipulator grabs, as in Onshape),
+`Ctrl+A` takes every element, and every selected element is outlined in the accent colour while
+the **primary** — the last one clicked, whose numbers the panel edits — also carries the shader
+tint. One gizmo drag moves the whole selection as one undoable command, and duplicate, delete and
+mirror act on all of it. The **selection filter** is `Click picks: Elements | Faces`: in Faces a
+single click lands on the face under the cursor instead of needing the second, depth-cycling
+click. Verified by `model3d-multi.mjs`, including an on-canvas accent-pixel count so "the
+selection is visible" is measured rather than assumed. Still not built: view-cube refinements.
 
 ### M19 — Export and round-trip
 Java block/item writer preserving unknown keys and key order; Bedrock `.geo.json`;

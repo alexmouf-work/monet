@@ -6,16 +6,16 @@ numbered spec (`docs/00`–`docs/10`) — do not duplicate it here; describe rea
 
 ## State: v1 complete (2026-08-09, M0–M12), plus owner requests since
 
-Every feature in `docs/00 §3` is implemented and exercised in a real browser. 193 unit tests
+Every feature in `docs/00 §3` is implemented and exercised in a real browser. 199 unit tests
 (`src/core` plus the pure GitHub OAuth helpers); behaviour verified by harness scenarios (below).
 
 **3D model mode** (`docs/11-3d-model-mode.md`) is complete through M19a: M13 viewport, M14
 face→texture + live link, M15 painting on the model, M16 modelling (element CRUD, numeric
 properties, translate gizmo, vanilla validation), M17 UV editing (box-UV, per-face
 rects/rotation/mirror, the UV tab over the live texture), M18 Onshape interaction (inference
-snapping, measurement, depth cycling, context menus), M19 export/round-trip (source-merged Java
-writer, Bedrock geometry, `.monet_model`, icon renders) and M19a display slots + preview.
-Outstanding: M18's selection filters and multi-select transforms.
+snapping, measurement, depth cycling, multi-select + filters, context menus), M19 export/round-trip
+(source-merged Java writer, Bedrock geometry, `.monet_model`, icon renders) and M19a display slots
++ preview. Every milestone in docs/11 §16 is green; view-cube refinements are the one deferral.
 
 ## Tree
 
@@ -55,6 +55,7 @@ src/core/model3d/                      PURE 3D: types, vec/mat4, orbit camera, j
   uv.ts                                box-UV cross, mirror = endpoint swap, fit = vanilla projection
   infer.ts                             alignment inference on a drag axis; box gaps (measurement)
   display.ts                           display slots → model matrix + vanilla per-slot defaults
+  screen.ts                            projected element rects — box-select hit testing
 
 src/engine3d/glRenderer.ts             raw WebGL2 viewport (D11.1): mesh+line programs,
                                        NEAREST textures, frontFace(CW), context-loss rebuild
@@ -138,7 +139,8 @@ duplicate/mirror, gizmo snapping, vanillaMode, JSON save) · `model3d-uv` (M17: 
 64×32 sheet, fill-lands-in-rect, face editors, rect dragging) · `model3d-snap` (M18: fractional
 inference alignment, measurement, depth cycling, context menus) · `model3d-export` (M19: clean
 Java round-trip, Bedrock conversion, project zip, icon render) · `model3d-display` (M19a: slot
-preview matrices, paused editing, slot edit → saved JSON). Fixture jars are built fresh each run by
+preview matrices, paused editing, slot edit → saved JSON) · `model3d-multi` (multi-select:
+box-select, on-canvas outline count, one-step multi-move, filters). Fixture jars are built fresh each run by
 `tests/manual/fixtures/jar.mjs` (Node-side zip + hand-rolled PNG encoder) — nothing depends on
 leftover /tmp files. The harness launches Chromium with swiftshader flags so WebGL2 works
 headless.
@@ -313,6 +315,12 @@ submission, not GPU rasterisation.
   the same rewind-then-execute pattern strokes use.
 - A click on the SELECTED element's gizmo arm grabs the gizmo, not the element — correct, but it
   means viewport click tests must aim away from the arms (they reach 7 units from the centre).
+  An arm pointing at the camera projects to a POINT on the element centre (the z arm in a front
+  view) and used to swallow every click there; arms under 12 screen px are ignored.
+- 3D selection is a SET (`selectedElementIds`) whose last member is the primary
+  (`selectedElementId`) — the primary drives the panel fields, the gizmo and the shader tint,
+  while the whole set is outlined and transformed. Single-selection consumers read the primary
+  and need no changes.
 - Model undo/redo drops a stale element selection: undoing an Add otherwise leaves the gizmo and
   panel pointing at an element that no longer exists.
 - A model document's `raw` (its source file's own JSON) and `baseline` (element signature at load)

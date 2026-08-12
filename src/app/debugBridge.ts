@@ -42,6 +42,8 @@ export interface MonetDebug {
   modelFrame(): { pixels: number[]; width: number; height: number } | null;
   /** A model point through the previewed display slot's matrix, or null when not previewing. */
   displayPreviewPoint(x: number, y: number, z: number): { x: number; y: number; z: number } | null;
+  /** Every selected element id (docs/11 §10.1 multi-select). */
+  selectedElements(): number[];
 }
 
 export function installDebugBridge(): void {
@@ -187,6 +189,9 @@ export function installDebugBridge(): void {
     modelFrame() {
       const frame = modelRenderer()?.readFrame();
       return frame ? { ...frame, pixels: Array.from(frame.pixels) } : null;
+    },
+    selectedElements() {
+      return [...useDocStore.getState().selectedElementIds];
     },
     displayPreviewPoint(x, y, z) {
       const slot = displayPreview();

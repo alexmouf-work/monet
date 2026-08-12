@@ -23,12 +23,18 @@ import {
 } from '../../core/model3d/types';
 import { DISPLAY_LABEL, effectiveSlot } from '../../core/model3d/display';
 import { frameModel, snapView, updateCamera, viewPrefs } from '../ModelWorkspace';
-import { displayPreview, setDisplayPreview } from '../../app/modelViewState';
+import {
+  displayPreview,
+  selectionFilter,
+  setDisplayPreview,
+  setSelectionFilter,
+} from '../../app/modelViewState';
 import { NumField } from '../controls/NumField';
 
 export function ModelPanel() {
   const doc = useDocStore((s) => (s.activeId ? s.models[s.activeId] : null));
   const selectedId = useDocStore((s) => s.selectedElementId);
+  const selectedIds = useDocStore((s) => s.selectedElementIds);
   useDocStore((s) => s.rev);
   const [, force] = useState(0);
   if (!doc) return null;
@@ -134,6 +140,28 @@ export function ModelPanel() {
         </label>
       </div>
 
+      <div className="field-row">
+        <span className="field-label" title="What a click in the viewport selects">
+          Click picks
+        </span>
+        <div className="segmented">
+          <button
+            className={selectionFilter() === 'element' ? 'is-active' : ''}
+            onClick={toggle(() => setSelectionFilter('element'))}
+            title="Elements — click again on the same element to reach its face"
+          >
+            Elements
+          </button>
+          <button
+            className={selectionFilter() === 'face' ? 'is-active' : ''}
+            onClick={toggle(() => setSelectionFilter('face'))}
+            title="Faces — one click lands straight on the face under the cursor"
+          >
+            Faces
+          </button>
+        </div>
+      </div>
+
       <label className="check" title="Refuse edits vanilla Minecraft would reject (docs/11 §13.2)">
         <input
           type="checkbox"
@@ -147,7 +175,10 @@ export function ModelPanel() {
 
       <div className="panel__section">
         <div className="field-row">
-          <span className="field-label">Elements ({doc.elements.length})</span>
+          <span className="field-label">
+            Elements ({doc.elements.length})
+            {selectedIds.length > 1 ? ` · ${selectedIds.length} selected` : ''}
+          </span>
           <button className="btn" onClick={addCube} title="Add cube (N)">
             + Cube
           </button>
@@ -158,8 +189,13 @@ export function ModelPanel() {
             return (
               <li key={e.id}>
                 <button
-                  className={`outliner__row outliner__row--btn ${e.id === selectedId ? 'is-active' : ''}`}
-                  onClick={() => ds.selectElement(e.id === selectedId ? null : e.id)}
+                  className={`outliner__row outliner__row--btn ${
+                    selectedIds.includes(e.id) ? 'is-active' : ''
+                  } ${e.id === selectedId && selectedIds.length > 1 ? 'is-primary' : ''}`}
+                  onClick={(ev) => {
+                    if (ev.ctrlKey || ev.metaKey || ev.shiftKey) ds.toggleElement(e.id);
+                    else ds.selectElement(e.id === selectedId ? null : e.id);
+                  }}
                   title={`${e.from.x},${e.from.y},${e.from.z} → ${e.to.x},${e.to.y},${e.to.z}`}
                 >
                   <span className="outliner__icon">▣</span>
@@ -179,6 +215,12 @@ export function ModelPanel() {
 
       {el && (
         <div className="panel__section">
+          {selectedIds.length > 1 && (
+            <p className="panel__hint">
+              {selectedIds.length} elements selected — the fields below edit #{el.id}; the gizmo,
+              duplicate, delete and mirror act on all of them.
+            </p>
+          )}
           <div className="field-row">
             <span className="field-label">#{el.id}</span>
             <input
@@ -308,8 +350,8 @@ export function ModelPanel() {
       <DisplaySection />
 
       <p className="panel__hint">
-        Click an element to select it; drag its axis arrows to move (⇧ = ½ steps, Alt = free).
-        Fields take arithmetic: 8+2, 16/3.
+        Click an element to select it, Ctrl/⇧-click to add, or drag a box over empty space. Drag the
+        axis arrows to move (⇧ = ½ steps, Alt = free). Fields take arithmetic: 8+2, 16/3.
       </p>
     </div>
   );

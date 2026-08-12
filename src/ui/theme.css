@@ -1550,3 +1550,19 @@ code {
   opacity: 0.35;
   cursor: default;
 }
+
+/* 3D box-select rubber band (docs/11 §10.1 item 3). */
+.marquee3d {
+  position: absolute;
+  pointer-events: none;
+  border: 1px dashed var(--accent);
+  background: var(--accent-soft);
+  z-index: 20;
+}
+
+/* The primary element in a multi-selection: the one the property fields edit. */
+.outliner__row--btn.is-primary {
+  box-shadow:
+    inset 2px 0 0 var(--accent),
+    inset 0 0 0 1px var(--accent);
+}

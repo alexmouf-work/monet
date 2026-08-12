@@ -32,15 +32,17 @@ import {
   type StandardView,
 } from '../core/model3d/camera';
 import { multiply, transformPoint } from '../core/model3d/vec';
-import { PatchElementCommand } from '../core/model3d/commands';
+import { PatchElementCommand, PatchElementsCommand } from '../core/model3d/commands';
 import type { Axis, ModelElement, Vec3 } from '../core/model3d/types';
 import { displayMatrix, effectiveSlot } from '../core/model3d/display';
 import { modelBounds } from '../core/model3d/geometry';
 import { faceKey } from '../core/model3d/geometry';
 import { pickModel } from '../core/model3d/pick';
+import { elementsInBox, type ScreenRect } from '../core/model3d/screen';
 import type { FaceHit, Model3D } from '../core/model3d/types';
 import {
   displayPreview,
+  selectionFilter,
   modelHover as hoverNow,
   modelRenderer as rendererNow,
   reportDragReadout,
@@ -67,6 +69,7 @@ export const viewPrefs = { flatShade: false, grid: true };
  * the gizmo all stand down for the duration. The slot itself lives in app/modelViewState.
  */
 export { displayPreview, setDisplayPreview } from '../app/modelViewState';
+export { selectionFilter, setSelectionFilter, type SelectionFilter } from '../app/modelViewState';
 
 // Hover + renderer registry live in app/modelViewState (no ui imports) so debugBridge can
 // read them without dragging the ui module graph into its import chain.
@@ -147,6 +150,7 @@ export function ModelWorkspace() {
   const hostRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const spaceRef = useRef(false);
+  const marqueeRef = useRef<HTMLDivElement>(null);
   const [menu, setMenu] = useState<MenuState | null>(null);
 
   useEffect(() => {
@@ -173,6 +177,11 @@ export function ModelWorkspace() {
         textures: model ? modelTextures(model.id) : new Map(),
         hoverKey: hoverNow() ? faceKey(hoverNow()!.elementId, hoverNow()!.face) : -1,
         selectedElement: selected?.id ?? -1,
+        selectedBoxes: model
+          ? model.elements
+              .filter((e) => ds.selectedElementIds.includes(e.id))
+              .map((e) => modelBounds([e]))
+          : [],
         accent: themeColors().accent,
         gizmo: selected ? elementCentre(selected) : null,
         snapLine: snapPlane,
@@ -199,17 +208,34 @@ export function ModelWorkspace() {
     const offHover = subscribeModelHover(() => renderer.invalidate(false));
 
     // --- navigation (D11.2) + tools (docs/11 §8, §10) --------------------------------
-    type DragMode = 'orbit' | 'pan' | 'paint' | 'gizmo' | null;
+    type DragMode = 'orbit' | 'pan' | 'paint' | 'gizmo' | 'marquee' | null;
     let drag: DragMode = null;
     let last = { x: 0, y: 0 };
     let moved = 0;
     let gizmoDrag: {
       axis: Axis;
       before: ModelElement;
+      /** Every selected element as it was when the drag began — they all move together. */
+      others: ModelElement[];
       startT: number;
     } | null = null;
     /** Inference plane held by the current drag — getScene hands it to the renderer. */
     let snapPlane: { axis: Axis; value: number } | null = null;
+    /** Box-select in progress: canvas-space start point, and whether it adds to the selection. */
+    let marquee: { x: number; y: number; add: boolean } | null = null;
+    let currentBox: ScreenRect = { x: 0, y: 0, w: 0, h: 0 };
+    /** Drive the marquee straight through the DOM — a rubber band must not re-render React. */
+    const setBox = (r: ScreenRect | null) => {
+      currentBox = r ?? { x: 0, y: 0, w: 0, h: 0 };
+      const box = marqueeRef.current;
+      if (!box) return;
+      box.style.display = r ? 'block' : 'none';
+      if (!r) return;
+      box.style.left = `${r.x}px`;
+      box.style.top = `${r.y}px`;
+      box.style.width = `${r.w}px`;
+      box.style.height = `${r.h}px`;
+    };
 
     /** Model-space point → canvas px, through the same matrices the renderer uses. */
     const toScreen = (p: Vec3) => {
@@ -268,7 +294,11 @@ export function ModelWorkspace() {
         // Distance from the pointer to the screen-space segment o→tip.
         const vx = tip.x - o.x;
         const vy = tip.y - o.y;
-        const len2 = vx * vx + vy * vy || 1;
+        const len2 = vx * vx + vy * vy;
+        // An arm pointing at the camera projects to (nearly) a point — in a front view that is
+        // the z arm, sitting exactly on the element centre. Dragging it means nothing, and
+        // treating it as grabbable swallows every click on the middle of the element.
+        if (len2 < 12 * 12) continue;
         const t = Math.max(0.15, Math.min(1, ((p.x - o.x) * vx + (p.y - o.y) * vy) / len2));
         const dx = p.x - (o.x + vx * t);
         const dy = p.y - (o.y + vy * t);
@@ -314,9 +344,13 @@ export function ModelWorkspace() {
         } else if (model && grab) {
           const ds = useDocStore.getState();
           const el = model.elements.find((x) => x.id === ds.selectedElementId)!;
+          const ids = new Set(ds.selectedElementIds);
           gizmoDrag = {
             axis: grab.axis,
             before: JSON.parse(JSON.stringify(el)),
+            others: model.elements
+              .filter((x) => ids.has(x.id))
+              .map((x) => JSON.parse(JSON.stringify(x)) as ModelElement),
             startT: axisParam(grab.origin, grab.axis, e),
           };
           drag = 'gizmo';
@@ -332,8 +366,15 @@ export function ModelWorkspace() {
         } else if (model && hit && isPaintTool(tool)) {
           beginModelStroke(model, hit);
           drag = 'paint';
+        } else if (tool === 'select' && !hit && !displayPreview()) {
+          // Empty space with the select tool: box-select (docs/11 §10.1 item 3). Ctrl/Shift
+          // adds to the selection; a plain drag replaces it.
+          const p = canvasPoint(e);
+          marquee = { x: p.x, y: p.y, add: e.ctrlKey || e.metaKey || e.shiftKey };
+          setBox({ x: p.x, y: p.y, w: 0, h: 0 });
+          drag = 'marquee';
         } else {
-          // Pan tool pans; anything else (no face, select over empty space, …) orbits.
+          // Pan tool pans; anything else (no face on a non-select tool, …) orbits.
           drag = tool === 'pan' ? 'pan' : 'orbit';
         }
       }
@@ -347,6 +388,16 @@ export function ModelWorkspace() {
         last = { x: e.clientX, y: e.clientY };
         const model = useDocStore.getState().activeModel();
         if (model) extendModelStroke(model, hitAt(e));
+        return;
+      }
+      if (drag === 'marquee' && marquee) {
+        const p = canvasPoint(e);
+        setBox({
+          x: Math.min(marquee.x, p.x),
+          y: Math.min(marquee.y, p.y),
+          w: Math.abs(p.x - marquee.x),
+          h: Math.abs(p.y - marquee.y),
+        });
         return;
       }
       if (drag === 'gizmo' && gizmoDrag) {
@@ -367,7 +418,12 @@ export function ModelWorkspace() {
         }
         snapPlane = snap ? { axis: gizmoDrag.axis, value: snap.at } : null;
         reportDragReadout({ axis: gizmoDrag.axis, delta, inference: !!snap });
-        applyAxisDelta(el, gizmoDrag.before, gizmoDrag.axis, delta);
+        // Every selected element moves by the same delta, from its own grab-time snapshot.
+        for (const base of gizmoDrag.others) {
+          const live = model.elements.find((x) => x.id === base.id);
+          if (live) applyAxisDelta(live, base, gizmoDrag.axis, delta);
+        }
+        if (!gizmoDrag.others.length) applyAxisDelta(el, gizmoDrag.before, gizmoDrag.axis, delta);
         invalidate(true); // geometry changed → mesh rebuild
         return;
       }
@@ -391,20 +447,50 @@ export function ModelWorkspace() {
     };
 
     const endDrag = (e: PointerEvent) => {
+      if (drag === 'marquee' && marquee) {
+        const box = { ...currentBox };
+        const add = marquee.add;
+        marquee = null;
+        setBox(null);
+        drag = null;
+        const ds = useDocStore.getState();
+        const model = ds.activeModel();
+        const r = canvas.getBoundingClientRect();
+        if (model && box.w * box.h > 9) {
+          const vp = multiply(
+            projMatrix(model.camera, r.width / Math.max(1, r.height)),
+            viewMatrix(model.camera),
+          );
+          const hits = elementsInBox(model.elements, box, vp, r.width, r.height);
+          ds.selectElements(add ? [...new Set([...ds.selectedElementIds, ...hits])] : hits);
+        } else if (!add) {
+          ds.selectElement(null); // a click on empty space clears the selection
+        }
+        return;
+      }
       if (drag === 'gizmo' && gizmoDrag) {
         const ds = useDocStore.getState();
         const model = ds.activeModel();
         const el = model?.elements.find((x) => x.id === ds.selectedElementId);
         if (model && el) {
-          const after = JSON.parse(JSON.stringify(el)) as ModelElement;
-          // Rewind to `before`, then let the command's do() apply `after` — history and the
-          // live document can never disagree (the 2D stroke pattern).
-          const idx = model.elements.findIndex((x) => x.id === el.id);
-          model.elements[idx] = JSON.parse(JSON.stringify(gizmoDrag.before));
-          if (JSON.stringify(after) !== JSON.stringify(gizmoDrag.before)) {
-            ds.executeModel(new PatchElementCommand('Move element', gizmoDrag.before, after));
+          // Rewind every dragged element to its grab-time snapshot, then let the command's do()
+          // apply the result — history and the live document can never disagree (2D's pattern).
+          const bases = gizmoDrag.others.length ? gizmoDrag.others : [gizmoDrag.before];
+          const pairs = bases.map((base) => {
+            const live = model.elements.find((x) => x.id === base.id)!;
+            const after = JSON.parse(JSON.stringify(live)) as ModelElement;
+            const idx = model.elements.findIndex((x) => x.id === base.id);
+            model.elements[idx] = JSON.parse(JSON.stringify(base)) as ModelElement;
+            return { before: base, after };
+          });
+          const changed = pairs.some((p) => JSON.stringify(p.before) !== JSON.stringify(p.after));
+          if (!changed) invalidate(true);
+          else if (pairs.length === 1) {
+            ds.executeModel(
+              new PatchElementCommand('Move element', pairs[0].before, pairs[0].after),
+            );
           } else {
-            invalidate(true);
+            ds.executeModel(new PatchElementsCommand('Move elements', pairs));
           }
         }
         gizmoDrag = null;
@@ -429,8 +515,21 @@ export function ModelWorkspace() {
       ) {
         const hit = hitAt(e);
         const ds = useDocStore.getState();
-        if (hit && hit.elementId === ds.selectedElementId) ds.selectFace(hit.face);
-        else ds.selectElement(hit ? hit.elementId : null);
+        if (hit && (e.ctrlKey || e.metaKey || e.shiftKey)) {
+          ds.toggleElement(hit.elementId); // add to / remove from the selection
+        } else if (hit && selectionFilter() === 'face') {
+          // Face filter: one click lands on the face, no element step (docs/11 §10.1 item 3).
+          ds.selectElement(hit.elementId);
+          ds.selectFace(hit.face);
+        } else if (
+          hit &&
+          hit.elementId === ds.selectedElementId &&
+          ds.selectedElementIds.length === 1
+        ) {
+          ds.selectFace(hit.face);
+        } else {
+          ds.selectElement(hit ? hit.elementId : null);
+        }
       }
       // A right CLICK (no drag) opens the context menu for what is under the cursor
       // (docs/11 §10.1 item 5); right-DRAG stays the orbit alias.
@@ -521,6 +620,7 @@ export function ModelWorkspace() {
         className="workspace__canvas"
         style={{ cursor: isPaintTool(activeTool) ? 'crosshair' : 'default' }}
       />
+      <div className="marquee3d" ref={marqueeRef} style={{ display: 'none' }} />
       <ViewCube />
       {menu && <ModelContextMenu menu={menu} onClose={() => setMenu(null)} />}
     </div>

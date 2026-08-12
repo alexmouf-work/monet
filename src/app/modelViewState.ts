@@ -44,6 +44,16 @@ let previewSlot: DisplaySlotName | null = null;
 export const setDisplayPreview = (slot: DisplaySlotName | null): void => void (previewSlot = slot);
 export const displayPreview = (): DisplaySlotName | null => previewSlot;
 
+/**
+ * Selection filter (docs/11 §10.1 item 3): what a click in the viewport targets. `element`
+ * cycles element → face on a second click; `face` takes the face straight away, which is what
+ * you want while painting or fixing UVs.
+ */
+export type SelectionFilter = 'element' | 'face';
+let filter: SelectionFilter = 'element';
+export const setSelectionFilter = (f: SelectionFilter): void => void (filter = f);
+export const selectionFilter = (): SelectionFilter => filter;
+
 /** Live gizmo-drag readout (docs/11 §10.1 item 4) — the status bar renders it. */
 export interface DragReadout {
   axis: 'x' | 'y' | 'z';

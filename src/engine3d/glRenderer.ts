@@ -21,7 +21,12 @@ export interface ModelScene {
   camera: CameraState;
   textures: Map<string, ModelTexturePixels>;
   hoverKey: number; // faceKey under the cursor, -1 for none
-  selectedElement: number; // element id, -1 for none
+  selectedElement: number; // PRIMARY element id (tinted), -1 for none
+  /** Every selected element's box, outlined in accent — how multi-select reads (docs/11 §10.1). */
+  selectedBoxes: {
+    min: { x: number; y: number; z: number };
+    max: { x: number; y: number; z: number };
+  }[];
   accent: string; // CSS hex from the theme
   /** Translate-gizmo origin in model space, or null (docs/11 §10.1 item 4). */
   gizmo: { x: number; y: number; z: number } | null;
@@ -497,6 +502,33 @@ export class ModelRenderer {
     }
     gl.bindVertexArray(null);
     gl.disable(gl.CULL_FACE);
+
+    // Selection outlines: every selected element's box, depth-off so a boxed element behind
+    // another is still visibly selected. The primary one also carries the shader's tint.
+    if (scene.selectedBoxes.length) {
+      gl.disable(gl.DEPTH_TEST);
+      gl.useProgram(this.lineProgram);
+      gl.uniformMatrix4fv(gl.getUniformLocation(this.lineProgram, 'uMVP'), false, mvp);
+      const verts: number[] = [];
+      for (const b of scene.selectedBoxes) {
+        const xs = [b.min.x, b.max.x];
+        const ys = [b.min.y, b.max.y];
+        const zs = [b.min.z, b.max.z];
+        for (const y of ys) for (const z of zs) verts.push(xs[0], y, z, xs[1], y, z);
+        for (const x of xs) for (const z of zs) verts.push(x, ys[0], z, x, ys[1], z);
+        for (const x of xs) for (const y of ys) verts.push(x, y, zs[0], x, y, zs[1]);
+      }
+      const buf = gl.createBuffer()!;
+      gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(verts), gl.STREAM_DRAW);
+      gl.enableVertexAttribArray(0);
+      gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+      const [br, bg, bb] = hexToRGB(scene.accent);
+      gl.uniform4f(gl.getUniformLocation(this.lineProgram, 'uColor'), br, bg, bb, 1);
+      gl.drawArrays(gl.LINES, 0, verts.length / 3);
+      gl.deleteBuffer(buf);
+      gl.enable(gl.DEPTH_TEST);
+    }
 
     // Translate gizmo: three axis segments through the depth buffer (always visible).
     if (scene.gizmo && !scene.modelMatrix) {

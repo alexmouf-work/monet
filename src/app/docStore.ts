@@ -58,8 +58,14 @@ interface DocState {
   modelHistories: Record<string, ModelHistory>;
   selection: SelectionState | null;
   selectedObjectId: number | null;
-  /** The selected 3D element of the active model (docs/11 §10.2). */
+  /**
+   * The PRIMARY selected 3D element — the one whose properties the panel edits and whose gizmo
+   * is drawn (docs/11 §10.2). `selectedElementIds` is the whole selection; the primary is its
+   * last member, so every single-selection consumer keeps working unchanged.
+   */
   selectedElementId: number | null;
+  /** Every selected element, for multi-select transforms (docs/11 §10.1). */
+  selectedElementIds: number[];
   /** One level deeper (docs/11 §10.1 item 3): a face of the selected element, or null. */
   selectedFace: Face | null;
   rev: number;
@@ -98,6 +104,10 @@ interface DocState {
   setSelection(s: SelectionState | null): void;
   selectObject(id: number | null): void;
   selectElement(id: number | null): void;
+  /** Replace the whole element selection; the last id becomes primary. */
+  selectElements(ids: number[]): void;
+  /** Add or remove one element (Ctrl/Shift-click) keeping the rest. */
+  toggleElement(id: number): void;
   selectFace(face: Face | null): void;
   /** Clear the element selection when history removed the element it pointed at. */
   dropStaleElementSelection(m: Model3D): void;
@@ -125,6 +135,7 @@ export const useDocStore = create<DocState>((set, get) => ({
   selection: null,
   selectedObjectId: null,
   selectedElementId: null,
+  selectedElementIds: [],
   selectedFace: null,
   rev: 0,
 
@@ -208,6 +219,7 @@ export const useDocStore = create<DocState>((set, get) => ({
       selection: null,
       selectedObjectId: null,
       selectedElementId: null,
+      selectedElementIds: [],
       selectedFace: null,
     });
     get().bump();
@@ -394,8 +406,23 @@ export const useDocStore = create<DocState>((set, get) => ({
 
   selectElement(id) {
     // Changing depth-1 selection always climbs out of depth 2.
-    set({ selectedElementId: id, selectedFace: null });
+    set({ selectedElementId: id, selectedElementIds: id === null ? [] : [id], selectedFace: null });
     get().bump(false);
+  },
+
+  selectElements(ids) {
+    set({
+      selectedElementIds: [...ids],
+      selectedElementId: ids.length ? ids[ids.length - 1] : null,
+      selectedFace: null,
+    });
+    get().bump(false);
+  },
+
+  toggleElement(id) {
+    const current = get().selectedElementIds;
+    const next = current.includes(id) ? current.filter((x) => x !== id) : [...current, id];
+    get().selectElements(next);
   },
 
   selectFace(face) {
@@ -404,9 +431,15 @@ export const useDocStore = create<DocState>((set, get) => ({
   },
 
   dropStaleElementSelection(m) {
-    const id = get().selectedElementId;
-    if (id != null && !m.elements.some((e) => e.id === id)) {
-      set({ selectedElementId: null, selectedFace: null });
+    const live = new Set(m.elements.map((e) => e.id));
+    const ids = get().selectedElementIds.filter((id) => live.has(id));
+    const primary = get().selectedElementId;
+    if (ids.length !== get().selectedElementIds.length || (primary != null && !live.has(primary))) {
+      set({
+        selectedElementIds: ids,
+        selectedElementId: ids.length ? ids[ids.length - 1] : null,
+        selectedFace: null,
+      });
     }
   },
 

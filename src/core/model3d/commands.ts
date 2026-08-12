@@ -33,6 +33,24 @@ export class AddElementCommand implements ModelCommand {
   }
 }
 
+/** Several elements added as one step — duplicating a multi-selection (docs/11 §10.1). */
+export class AddElementsCommand implements ModelCommand {
+  private snapshots: ModelElement[];
+  constructor(
+    public label: string,
+    elements: ModelElement[],
+  ) {
+    this.snapshots = elements.map(cloneElement);
+  }
+  do(m: Model3D) {
+    for (const el of this.snapshots) m.elements.push(cloneElement(el));
+  }
+  undo(m: Model3D) {
+    const ids = new Set(this.snapshots.map((e) => e.id));
+    m.elements = m.elements.filter((e) => !ids.has(e.id));
+  }
+}
+
 export class RemoveElementsCommand implements ModelCommand {
   private removed: { index: number; element: ModelElement }[];
   constructor(
@@ -113,5 +131,35 @@ export class SetDisplayCommand implements ModelCommand {
   }
   undo(m: Model3D) {
     this.set(m, this.before);
+  }
+}
+
+/** Several elements patched as one step — multi-select transforms (docs/11 §10.1). */
+export class PatchElementsCommand implements ModelCommand {
+  private pairs: { before: ModelElement; after: ModelElement }[];
+  constructor(
+    public label: string,
+    pairs: { before: ModelElement; after: ModelElement }[],
+  ) {
+    this.pairs = pairs.map((p) => ({
+      before: cloneElement(p.before),
+      after: cloneElement(p.after),
+    }));
+  }
+  private swap(
+    m: Model3D,
+    pick: (p: { before: ModelElement; after: ModelElement }) => ModelElement,
+  ) {
+    for (const pair of this.pairs) {
+      const to = pick(pair);
+      const i = m.elements.findIndex((e) => e.id === to.id);
+      if (i >= 0) m.elements[i] = cloneElement(to);
+    }
+  }
+  do(m: Model3D) {
+    this.swap(m, (p) => p.after);
+  }
+  undo(m: Model3D) {
+    this.swap(m, (p) => p.before);
   }
 }

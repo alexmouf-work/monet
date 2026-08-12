@@ -241,7 +241,10 @@ export function useShortcuts(actions: ShortcutActions) {
             return;
           case 'KeyA':
             e.preventDefault();
-            actions.selectAll();
+            // On a model, "select all" means every element (docs/11 §10.1).
+            if (ds.activeId && ds.models[ds.activeId]) {
+              ds.selectElements(ds.models[ds.activeId].elements.map((el) => el.id));
+            } else actions.selectAll();
             return;
           case 'KeyD':
             e.preventDefault();
