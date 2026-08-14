@@ -42,11 +42,18 @@ export function makeMarkerTip(size: number, tip: TipShape): TipMask {
   return { size, a };
 }
 
-/** Top-left placement of a tip stamped at doc-space point p — docs/02 §2. */
-export const tipOrigin = (p: { x: number; y: number }, size: number) => ({
-  x: Math.round(p.x) - Math.floor(size / 2),
-  y: Math.round(p.y) - Math.floor(size / 2),
-});
+/**
+ * Top-left placement of a tip stamped at doc-space point p — docs/02 §2.
+ *
+ * The point is a position INSIDE a pixel, so the pixel it names is `floor(p)` — never
+ * `round(p)`, which jumps to the next pixel as soon as the cursor passes a pixel's midpoint
+ * and paints one right/below the one under the cursor. The hovered pixel is always covered:
+ * dead centre for odd sizes, top-left of the middle 2×2 for even ones.
+ */
+export const tipOrigin = (p: { x: number; y: number }, size: number) => {
+  const off = Math.floor((size - 1) / 2);
+  return { x: Math.floor(p.x) - off, y: Math.floor(p.y) - off };
+};
 
 /** Integer Bresenham walk, inclusive of both ends — gap-free 1-px lines. */
 export function bresenham(
@@ -56,10 +63,11 @@ export function bresenham(
   y1: number,
   visit: (x: number, y: number) => void,
 ): void {
-  let x = Math.round(x0);
-  let y = Math.round(y0);
-  const ex = Math.round(x1);
-  const ey = Math.round(y1);
+  // floor, matching tipOrigin: the walk must visit the same pixels the endpoints stamp.
+  let x = Math.floor(x0);
+  let y = Math.floor(y0);
+  const ex = Math.floor(x1);
+  const ey = Math.floor(y1);
   const dx = Math.abs(ex - x);
   const dy = Math.abs(ey - y);
   const sx = x < ex ? 1 : -1;

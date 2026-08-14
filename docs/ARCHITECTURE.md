@@ -6,7 +6,7 @@ numbered spec (`docs/00`–`docs/10`) — do not duplicate it here; describe rea
 
 ## State: v1 complete (2026-08-09, M0–M12), plus owner requests since
 
-Every feature in `docs/00 §3` is implemented and exercised in a real browser. 199 unit tests
+Every feature in `docs/00 §3` is implemented and exercised in a real browser. 201 unit tests
 (`src/core` plus the pure GitHub OAuth helpers); behaviour verified by harness scenarios (below).
 
 **3D model mode** (`docs/11-3d-model-mode.md`) is complete through M19a: M13 viewport, M14
@@ -140,7 +140,8 @@ duplicate/mirror, gizmo snapping, vanillaMode, JSON save) · `model3d-uv` (M17: 
 inference alignment, measurement, depth cycling, context menus) · `model3d-export` (M19: clean
 Java round-trip, Bedrock conversion, project zip, icon render) · `model3d-display` (M19a: slot
 preview matrices, paused editing, slot edit → saved JSON) · `model3d-multi` (multi-select:
-box-select, on-canvas outline count, one-step multi-move, filters). Fixture jars are built fresh each run by
+box-select, on-canvas outline count, one-step multi-move, filters) · `pixel-alignment` (clicks
+at pixel corners land on that pixel — the helpers aim at centres, where the bug hid). Fixture jars are built fresh each run by
 `tests/manual/fixtures/jar.mjs` (Node-side zip + hand-rolled PNG encoder) — nothing depends on
 leftover /tmp files. The harness launches Chromium with swiftshader flags so WebGL2 works
 headless.
@@ -287,6 +288,10 @@ submission, not GPU rasterisation.
   selection must **anchor** it, never discard it.
 - Adjustment sessions must `resyncAdjust()` when the document changes underneath them, or
   previews outlive the pixels they were derived from.
+- A pointer position in document space is a point INSIDE a pixel: the pixel it names is
+  `floor(p)`. `round(p)` names the nearest pixel *boundary* — using it for stamp placement made
+  the brush paint one right/below the pixel under the cursor for the outer half of every pixel,
+  while the eyedropper, bucket and status bar (which floor) disagreed with it.
 - Geometry of one colour that overlaps itself must be composited **once** (`singlePass`, or a
   single crisp pass). Two passes double-blend the overlap, which shows as a darker seam at any
   alpha below 1.

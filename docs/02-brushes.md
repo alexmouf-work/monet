@@ -53,8 +53,14 @@ export function makeTip(size: number, tip: 'circle' | 'square'): TipMask {
 
 - `size` 1 and 2 circles degenerate to squares — that is correct and expected.
 - Stamp placement: pointer doc-space float position `p` → top-left
-  `sx = round(p.x) - floor(size / 2)`, same for `sy`. (Odd sizes centre on the
-  hovered pixel; even sizes bias up-left — stable and predictable at high zoom.)
+  `sx = floor(p.x) - floor((size - 1) / 2)`, same for `sy`. **`floor`, not `round`**: `p` is a
+  position inside a pixel, so the pixel it names is `floor(p)`; rounding names the nearest
+  pixel *boundary* and jumps to the next pixel as soon as the cursor passes the midpoint,
+  painting one right/below the pixel under the cursor. (This spec said `round` until
+  2026-08-11 while also claiming odd sizes centre on the hovered pixel — the two never agreed,
+  and the code followed the formula. Owner-reported, fixed, regression-tested.)
+- The hovered pixel is always covered: dead centre for odd sizes, top-left of the middle 2×2
+  for even ones.
 - The marker uses **graded** tips instead (see §4) — same placement rule.
 
 ## 3. The stroke engine (shared by pen, marker, eraser)
@@ -79,8 +85,9 @@ interface StrokeScratch {
 On pointer-down stamp once at `p₀`. On each move from `pPrev` to `p`, walk the
 segment and stamp at every step:
 
-- pen & eraser: integer steps via **Bresenham** between `round(pPrev)` and
-  `round(p)` (gap-free 1-px lines even for size 1);
+- pen & eraser: integer steps via **Bresenham** between `floor(pPrev)` and
+  `floor(p)` (gap-free 1-px lines even for size 1) — the same `floor` the stamp uses, so the
+  walk visits exactly the pixels the two endpoints stamp;
 - marker: fixed spacing `max(1, size * 0.25)` px along the segment (smooth falloff
   overlap).
 

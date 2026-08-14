@@ -76,9 +76,32 @@ describe('bresenham', () => {
 });
 
 describe('placement and spacing', () => {
-  it('odd tips centre on the hovered pixel', () => {
-    expect(tipOrigin({ x: 5.2, y: 7.8 }, 1)).toEqual({ x: 5, y: 8 });
-    expect(tipOrigin({ x: 5, y: 5 }, 3)).toEqual({ x: 4, y: 4 });
+  it('stamps the pixel the cursor is inside, anywhere within it', () => {
+    // The whole of pixel (5,7) — including its right and bottom halves, which used to round
+    // up and paint (6,8) instead: one right and one below the pixel under the cursor.
+    for (const [x, y] of [
+      [5, 7],
+      [5.2, 7.2],
+      [5.5, 7.5],
+      [5.99, 7.99],
+    ]) {
+      expect(tipOrigin({ x, y }, 1)).toEqual({ x: 5, y: 7 });
+    }
+    expect(tipOrigin({ x: -0.4, y: -0.1 }, 1)).toEqual({ x: -1, y: -1 }); // left of the canvas
+  });
+
+  it('centres odd tips on that pixel and puts even tips top-left of it', () => {
+    expect(tipOrigin({ x: 5.9, y: 5.1 }, 3)).toEqual({ x: 4, y: 4 }); // 5±1
+    expect(tipOrigin({ x: 5.9, y: 5.1 }, 5)).toEqual({ x: 3, y: 3 }); // 5±2
+    expect(tipOrigin({ x: 5.9, y: 5.1 }, 2)).toEqual({ x: 5, y: 5 }); // covers 5..6
+    expect(tipOrigin({ x: 5.9, y: 5.1 }, 4)).toEqual({ x: 4, y: 4 }); // covers 4..7
+  });
+
+  it('bresenham walks from the pixel under the start to the pixel under the end', () => {
+    const pts: [number, number][] = [];
+    bresenham(2.9, 2.9, 5.1, 2.1, (x, y) => pts.push([x, y]));
+    expect(pts[0]).toEqual([2, 2]); // not [3, 3]
+    expect(pts[pts.length - 1]).toEqual([5, 2]);
   });
 
   it('spacedPoints ends exactly on the target', () => {
