@@ -8,6 +8,7 @@ const TABS: { id: FeatureTab; label: string; key: string }[] = [
   { id: 'text', label: 'Text', key: 'T' },
   { id: 'noise', label: 'Noise', key: 'N' },
   { id: 'recolour', label: 'Recolour', key: 'R' },
+  { id: 'relight', label: 'Relight', key: 'L' },
   { id: 'canvas', label: 'Canvas', key: 'C' },
 ];
 

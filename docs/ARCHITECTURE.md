@@ -6,7 +6,7 @@ numbered spec (`docs/00`–`docs/10`) — do not duplicate it here; describe rea
 
 ## State: v1 complete (2026-08-09, M0–M12), plus owner requests since
 
-Every feature in `docs/00 §3` is implemented and exercised in a real browser. 201 unit tests
+Every feature in `docs/00 §3` is implemented and exercised in a real browser. 215 unit tests
 (`src/core` plus the pure GitHub OAuth helpers); behaviour verified by harness scenarios (below).
 
 **3D model mode** (`docs/11-3d-model-mode.md`) is complete through M19a: M13 viewport, M14
@@ -42,6 +42,7 @@ src/core/                              PURE: no DOM, no React, all unit-tested
   shapes/{geometry,spline,transformOps}.ts  contours, Catmull-Rom, handle scaling
   noise/{fields,apply}.ts              13 fields from one hash, brightness/hue apply
   recolor/{replace,tint}.ts
+  relight/relight.ts                   brightness-only maps (hue never moves): match + adjust
   io/{monetFile,ico,bmp,pdfFit,pdfExport}.ts
 
 src/core/model3d/                      PURE 3D: types, vec/mat4, orbit camera, java model
@@ -111,7 +112,7 @@ src/ui/                                React; no business logic
                                        uv rects over the live texture), controls/NumField.tsx
   InstallBanner.tsx                    install offer; its pitch is the file association
   SourcesSidebar TextEditOverlay UpdatePrompt sceneHooks useShortcuts fonts theme.css
-  panels/{Brushes,Shapes,Text,Canvas,Noise,Recolour}Panel.tsx
+  panels/{Brushes,Shapes,Text,Canvas,Noise,Recolour,Relight}Panel.tsx
   controls/{Slider,ColorField}.tsx
   dialogs/{Dialog,NewDoc,Resize,Export,SaveAs,ConnectRepo,Sync,Settings,Recover,Confirm,Shortcuts}
 
@@ -141,7 +142,8 @@ inference alignment, measurement, depth cycling, context menus) · `model3d-expo
 Java round-trip, Bedrock conversion, project zip, icon render) · `model3d-display` (M19a: slot
 preview matrices, paused editing, slot edit → saved JSON) · `model3d-multi` (multi-select:
 box-select, on-canvas outline count, one-step multi-move, filters) · `pixel-alignment` (clicks
-at pixel corners land on that pixel — the helpers aim at centres, where the bug hid). Fixture jars are built fresh each run by
+at pixel corners land on that pixel — the helpers aim at centres, where the bug hid) ·
+`relight` (the owner's match scenario end to end, mapping differences, hue invariance). Fixture jars are built fresh each run by
 `tests/manual/fixtures/jar.mjs` (Node-side zip + hand-rolled PNG encoder) — nothing depends on
 leftover /tmp files. The harness launches Chromium with swiftshader flags so WebGL2 works
 headless.

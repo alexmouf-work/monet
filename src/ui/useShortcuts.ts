@@ -125,6 +125,7 @@ const TAB_KEYS: Record<string, FeatureTab> = {
   KeyT: 'text',
   KeyN: 'noise',
   KeyR: 'recolour',
+  KeyL: 'relight',
   KeyC: 'canvas',
 };
 

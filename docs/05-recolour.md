@@ -1,4 +1,4 @@
-# 05 — Recolour
+# 05 — Recolour and Relight
 
 Two modes in one feature tab, switched by a segmented control: **Replace** (swap
 specific colours) and **Tint** (uniform recolour respecting brightness). Both are
@@ -156,3 +156,66 @@ is over a handful of chips — no optimisation needed.
   histogram before = after within rounding); 50 % is a visible half-blend.
 - Undo after each bake restores byte-identical buffers.
 - Semi-transparent pixels keep their exact alpha through both modes.
+
+---
+
+## 7. Relight — `core/relight/relight.ts` (owner request 2026-08-11)
+
+Recolour's cousin. It **never touches hue**: it changes only how bright a pixel is, and
+carries the whole image along one curve so shading stays coherent.
+
+### 7.1 What "brightness" means
+
+A choice, because the word is ambiguous and the two readings disagree:
+
+| Measure | Definition | Behaviour |
+| ------- | ---------- | --------- |
+| `lightness` (**default**) | HSL `L` | Hue **and saturation** survive exactly, and every target is reachable. A pale blue set to a dark green's L becomes a dark blue of that hue. |
+| `luma` ("Perceived") | Rec.709 `0.2126R + 0.7152G + 0.0722B` | Truer when comparing across hues, but **not always reachable**: pure blue's luma tops out at 0.07, so matching a mid green means blending toward white. It clamps rather than shifting hue. |
+
+Setting a new brightness: `lightness` goes through HSL and is exact. `luma` scales the
+channels down (hue-preserving) or blends toward white to go up — the only way to raise a
+saturated colour's luma at all.
+
+### 7.2 Mode A — Match
+
+Pick a colour in the image (`from`) and the brightness to give it (`to`, itself picked from
+any colour). The pair defines a monotone map over the whole 0–1 range, applied to every
+pixel — that is the point: relighting one colour alone would break the shading against its
+neighbours.
+
+| Mapping | Curve | Keeps | Costs |
+| ------- | ----- | ----- | ----- |
+| `scale` (**default**) | `l · (to/from)` | shading **ratios** — the physical model of "the light got dimmer" | bright pixels clip |
+| `curve` | `l^γ`, `γ = ln(to)/ln(from)` | black and white pinned; nothing clips | shades below the anchor compress hard |
+| `shift` | `l + (to − from)` | the **spacing** between shades, exactly | both ends clip |
+
+All three hit the anchor exactly and are monotone, so shading order never inverts.
+Degenerate anchors (0 or 1) fall back to a two-segment line, since no exponent moves them.
+
+Optional **"only this colour (and near it)"** restricts the effect with Replace's per-channel
+Chebyshev tolerance; off by default.
+
+### 7.3 Mode B — Adjust
+
+Brightness (shift) and Contrast (pivot at mid-grey, factor `(1+c)/(1−c)` so ±c are
+reciprocal) over the whole image, same measure choice, same hue guarantee.
+
+### 7.4 Preview, bake and amount
+
+Shares §5's session. `amount` blends the relit pixel against the original.
+
+**Baking consumes the adjustment**: the session re-snapshots from the baked pixels so bakes
+can stack, so an unchanged panel would relight the already-relit image a second time the
+instant you click. Match re-anchors `from` on the colour it became (making the map an
+identity); Adjust zeroes its sliders. What you see after the bake is what you baked.
+
+### 7.5 Acceptance
+
+- A pale blue matched to a dark green's brightness becomes a **dark blue at that brightness**,
+  hue within a degree, and the rest of the sprite darkens with it in the same order.
+- Every mapping hits the anchor; the three differ away from it (verified: a mid band lands at
+  13 %, 1 % and 0 % under scale, curve and shift).
+- Hue never moves under any mapping, mode or measure.
+- The limit leaves every other colour byte-identical.
+- Alpha is preserved exactly, including partial alpha; fully transparent pixels are untouched.
