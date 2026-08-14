@@ -218,6 +218,42 @@ sprite, not the geometry. v1: render + paint, geometry read-only. Flag as its ow
 
 ---
 
+### 4.5 Local model bundles (owner request 2026-08-11)
+
+A model does not have to come from a connected jar or repo. The user can open one straight from
+their own machine, and Monet works out what it needs and asks for the rest.
+
+**Two routes in**, both ending in an in-memory source (`ModelBundleSource`) registered like any
+other, so parent resolution, the viewport, face→texture, painting and saving are unchanged:
+
+1. **Pick the JSON.** Monet parses it, walks the parent chain (vanilla ancestors come from the
+   builtin table in §4.2, so nobody is asked for `block/cube_all`), resolves the texture
+   variables and lists every texture the model references with its status. The user supplies
+   PNGs per row or in bulk.
+2. **Point at the folder.** Everything under it is indexed and matched automatically — asset
+   path first, then a path ending in that asset path (a pack usually sits under
+   `src/main/resources/`), then a unique basename. An ambiguous basename is NOT guessed: two
+   files called `gear.png` in different folders leave the row unmatched rather than picking the
+   wrong art. Uses the File System Access directory picker where it exists and
+   `<input webkitdirectory>` everywhere else.
+
+**Missing textures** take the magenta/black checker (`placeholderPixels`), per row or in bulk,
+and opening fills any still-missing ones automatically and says how many. A placeholder is a
+real 16×16 texture in the bundle, so it renders, paints and exports like any other — unlike an
+unresolved reference, which can only be looked at.
+
+**Getting it back out**: Export → *Model bundle (.zip)* writes every file the bundle holds, with
+the model JSON as it now stands and each texture carrying the pixels currently on the model, at
+the asset paths Minecraft expects. The option only appears for models that came from a bundle.
+
+**Acceptance** (`model-bundle.mjs`): a two-texture model asks for exactly two textures; a
+supplied PNG matches the row that wanted it; the other takes the placeholder; the model opens
+with no unresolved references and renders; paint applied to the placeholder face comes back out
+inside the exported zip (decoded and checked, not byte-length guessed); and the folder route
+resolves its texture with nothing left to ask for.
+
+---
+
 ## 5. The viewport
 
 One WebGL2 canvas replacing the 2D canvas inside the existing `.workspace` region. Same

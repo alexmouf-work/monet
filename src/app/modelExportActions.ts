@@ -12,13 +12,14 @@ import type { Model3D } from '../core/model3d/types';
 import { modelRenderer } from './modelViewState';
 import { toast } from './bus';
 
-export type ModelExportFormat = 'java' | 'bedrock' | 'monet_model' | 'png';
+export type ModelExportFormat = 'java' | 'bedrock' | 'monet_model' | 'png' | 'bundle';
 
 export const MODEL_EXPORT_LABEL: Record<ModelExportFormat, string> = {
   java: 'Java model (.json)',
   bedrock: 'Bedrock geometry (.geo.json)',
   monet_model: 'Monet project (.monet_model)',
   png: 'Render to PNG (current camera)',
+  bundle: 'Model bundle (.zip — model + every texture)',
 };
 
 const safeName = (model: Model3D) => model.name.replace(/\s+/g, '_') || 'model';
@@ -45,6 +46,11 @@ export async function exportModel(model: Model3D, format: ModelExportFormat): Pr
         `${base}.monet_model`,
       );
       toast(`Exported ${base}.monet_model`, 'ok');
+      return;
+    }
+    case 'bundle': {
+      const { downloadBundleZip } = await import('./modelBundleActions');
+      await downloadBundleZip(model);
       return;
     }
     case 'png': {

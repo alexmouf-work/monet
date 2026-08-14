@@ -107,11 +107,13 @@ export function SourcesSidebar({
   onAddJar,
   onAddRepo,
   onAddFolder,
+  onOpenModel,
   onSync,
 }: {
   onAddJar(): void;
   onAddRepo(): void;
   onAddFolder(): void;
+  onOpenModel(): void;
   onSync(sourceId: string): void;
 }) {
   const [, bump] = useState(0);
@@ -159,6 +161,15 @@ export function SourcesSidebar({
             }}
           >
             Local folder…
+          </button>
+          <button
+            className="btn"
+            onClick={() => {
+              setAddOpen(false);
+              onOpenModel();
+            }}
+          >
+            Minecraft model (.json)…
           </button>
         </div>
       )}

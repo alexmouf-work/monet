@@ -29,6 +29,7 @@ import { UnsavedDialog } from './ui/dialogs/ConfirmDialog';
 import { ShortcutsDialog } from './ui/dialogs/ShortcutsDialog';
 import { ResizeDialog } from './ui/dialogs/ResizeDialog';
 import { ExportDialog } from './ui/dialogs/ExportDialog';
+import { LoadModelDialog } from './ui/dialogs/LoadModelDialog';
 import { ConnectRepoDialog } from './ui/dialogs/ConnectRepoDialog';
 import { SyncDialog } from './ui/dialogs/SyncDialog';
 import { SettingsDialog } from './ui/dialogs/SettingsDialog';
@@ -58,7 +59,16 @@ import {
 } from './app/selectionActions';
 
 type DialogId =
-  'new' | 'recover' | 'shortcuts' | 'resize' | 'export' | 'repo' | 'settings' | 'saveAs' | null;
+  | 'new'
+  | 'recover'
+  | 'shortcuts'
+  | 'resize'
+  | 'export'
+  | 'repo'
+  | 'settings'
+  | 'saveAs'
+  | 'loadModel'
+  | null;
 
 export function App() {
   const [dialog, setDialog] = useState<DialogId>(null);
@@ -216,6 +226,7 @@ export function App() {
     () => ({
       newDoc: () => setDialog('new'),
       newModel: () => newModelDoc(),
+      openModel: () => setDialog('loadModel'),
       open: () => void openLocalFiles(),
       save: () => withActive((id) => void saveDoc(useDocStore.getState().docs[id])),
       // With writable sources connected, Save As offers them; otherwise go straight to a file.
@@ -300,6 +311,7 @@ export function App() {
         <SourcesSidebar
           onAddJar={() => void actions.addJar()}
           onAddRepo={() => setDialog('repo')}
+          onOpenModel={() => setDialog('loadModel')}
           onAddFolder={() => void actions.addFolder()}
           onSync={(id) => setSyncSourceId(id)}
         />
@@ -343,6 +355,7 @@ export function App() {
       {dialog === 'shortcuts' && <ShortcutsDialog onClose={() => setDialog(null)} />}
       {dialog === 'resize' && <ResizeDialog onClose={() => setDialog(null)} />}
       {dialog === 'export' && <ExportDialog onClose={() => setDialog(null)} />}
+      {dialog === 'loadModel' && <LoadModelDialog onClose={() => setDialog(null)} />}
       {dialog === 'repo' && (
         <ConnectRepoDialog
           onClose={() => setDialog(null)}

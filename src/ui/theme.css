@@ -1566,3 +1566,53 @@ code {
     inset 2px 0 0 var(--accent),
     inset 0 0 0 1px var(--accent);
 }
+
+/* Model bundle needs list (docs/11 §4.5): what the model asks for and what we have. */
+.needlist {
+  list-style: none;
+  margin: 4px 0;
+  padding: 0;
+  max-height: 260px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.needlist__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.needlist__row:last-child {
+  border-bottom: none;
+}
+
+.needlist__dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.needlist__dot.is-found {
+  background: var(--ok);
+}
+
+.needlist__dot.is-missing {
+  background: var(--danger);
+}
+
+.needlist__dot.is-placeholder {
+  background: #d000d0;
+}
+
+.needlist__path {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}

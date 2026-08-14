@@ -6,7 +6,7 @@ numbered spec (`docs/00`–`docs/10`) — do not duplicate it here; describe rea
 
 ## State: v1 complete (2026-08-09, M0–M12), plus owner requests since
 
-Every feature in `docs/00 §3` is implemented and exercised in a real browser. 215 unit tests
+Every feature in `docs/00 §3` is implemented and exercised in a real browser. 227 unit tests
 (`src/core` plus the pure GitHub OAuth helpers); behaviour verified by harness scenarios (below).
 
 **3D model mode** (`docs/11-3d-model-mode.md`) is complete through M19a: M13 viewport, M14
@@ -57,6 +57,7 @@ src/core/model3d/                      PURE 3D: types, vec/mat4, orbit camera, j
   infer.ts                             alignment inference on a drag axis; box gaps (measurement)
   display.ts                           display slots → model matrix + vanilla per-slot defaults
   screen.ts                            projected element rects — box-select hit testing
+  bundle.ts                            what a model file NEEDS + loose file matching + placeholder
 
 src/engine3d/glRenderer.ts             raw WebGL2 viewport (D11.1): mesh+line programs,
                                        NEAREST textures, frontFace(CW), context-loss rebuild
@@ -88,7 +89,8 @@ src/app/                               stores + action layer
   modelTextureSync.ts                  the live 2-way link: open image docs ARE their textures
   modelEditActions.ts                  add/duplicate/delete/mirror/face-off — panel, keys and
                                        context menu share one undoable route per edit
-  modelExportActions.ts                java / bedrock / .monet_model / render-to-PNG downloads
+  modelExportActions.ts                java / bedrock / .monet_model / render-to-PNG / bundle zip
+  modelBundleActions.ts                open a model from local files: the draft, its needs, the zip
   modelViewState.ts overlayRegistry.ts leaf modules: hover/renderer registry, overlay painters,
                                        live gizmo-drag readout, previewed display slot
   launchFiles.ts                       OS "open with" launches → docs bound to their handles
@@ -101,6 +103,7 @@ src/integrations/
   github/{oauth,auth}.ts               sign-in: pure flow helpers + session/refresh/installations
   jar/jarSource.ts                     jszip + IndexedDB cache, mcmeta badges
   fsa/{localFile,folderSource}.ts      pickers with download fallback; folder source
+  fsa/modelBundle.ts                   in-memory source for a user-supplied model + its textures
   idb.ts                               idb-keyval wrappers + autosave store
 
 src/ui/                                React; no business logic
@@ -143,7 +146,9 @@ Java round-trip, Bedrock conversion, project zip, icon render) · `model3d-displ
 preview matrices, paused editing, slot edit → saved JSON) · `model3d-multi` (multi-select:
 box-select, on-canvas outline count, one-step multi-move, filters) · `pixel-alignment` (clicks
 at pixel corners land on that pixel — the helpers aim at centres, where the bug hid) ·
-`relight` (the owner's match scenario end to end, mapping differences, hue invariance). Fixture jars are built fresh each run by
+`relight` (the owner's match scenario end to end, mapping differences, hue invariance) ·
+`model-bundle` (open a model from local files, placeholder a missing texture, paint it, and get
+it all back in a zip). Fixture jars are built fresh each run by
 `tests/manual/fixtures/jar.mjs` (Node-side zip + hand-rolled PNG encoder) — nothing depends on
 leftover /tmp files. The harness launches Chromium with swiftshader flags so WebGL2 works
 headless.

@@ -15,6 +15,7 @@ import {
   exportModel,
   type ModelExportFormat,
 } from '../../app/modelExportActions';
+import { isBundleModel } from '../../app/modelBundleActions';
 import type { Model3D } from '../../core/model3d/types';
 import { useDocStore } from '../../app/docStore';
 import { Slider } from '../controls/Slider';
@@ -169,11 +170,13 @@ function ModelExportDialog({ model, onClose }: { model: Model3D; onClose(): void
           onChange={(e) => setFormat(e.target.value as ModelExportFormat)}
           autoFocus
         >
-          {(Object.keys(MODEL_EXPORT_LABEL) as ModelExportFormat[]).map((f) => (
-            <option key={f} value={f}>
-              {MODEL_EXPORT_LABEL[f]}
-            </option>
-          ))}
+          {(Object.keys(MODEL_EXPORT_LABEL) as ModelExportFormat[])
+            .filter((f) => f !== 'bundle' || isBundleModel(model))
+            .map((f) => (
+              <option key={f} value={f}>
+                {MODEL_EXPORT_LABEL[f]}
+              </option>
+            ))}
         </select>
       </label>
 
@@ -193,6 +196,12 @@ function ModelExportDialog({ model, onClose }: { model: Model3D; onClose(): void
         <p className="panel__hint">
           Editable project: elements, groups, UVs, camera and the round-trip baseline. Texture
           pixels stay in their sources rather than being copied in.
+        </p>
+      )}
+      {format === 'bundle' && (
+        <p className="panel__hint">
+          Everything you loaded, back out as a zip: the model JSON as it now stands plus every
+          texture with your edits in it, at the paths Minecraft expects.
         </p>
       )}
       {format === 'png' && (
