@@ -113,7 +113,8 @@ export async function startBundleFromFiles(): Promise<void> {
 
 /** Route 2: point at the folder holding the model; textures come from around it. */
 export async function startBundleFromFolder(): Promise<void> {
-  const files = await pickDirectoryFiles();
+  const picked = await pickDirectoryFiles();
+  const { files, handles, root } = picked;
   if (files.size === 0) return;
   const jsons = [...files.keys()].filter((p) => /\.json$/i.test(p));
   if (jsons.length === 0) {
@@ -122,6 +123,13 @@ export async function startBundleFromFolder(): Promise<void> {
   }
   const source = createModelBundle('model folder');
   for (const [rel, file] of files) source.put(bundlePathFor(rel), await fileBytes(file));
+  // Keep the handles, keyed the same way the bytes are, so write-back can find the file a
+  // texture came from. Write-back itself stays OFF until the user asks for it.
+  if (root && handles) {
+    const byBundlePath = new Map<string, FileSystemFileHandle>();
+    for (const [rel, handle] of handles) byBundlePath.set(bundlePathFor(rel), handle);
+    source.attachDirectory(root, byBundlePath);
+  }
 
   // Prefer a model that actually parses and declares geometry or a parent.
   const candidates = jsons.map((p) => bundlePathFor(p));
@@ -141,6 +149,18 @@ export async function startBundleFromFolder(): Promise<void> {
   };
   analyseDraft();
   toast(`Indexed ${files.size} file${files.size === 1 ? '' : 's'} from the folder.`, 'ok');
+}
+
+/**
+ * Turn write-back on or off for the drafted bundle (owner request: default OFF). Returns what
+ * it ended up as — asking for write permission can be refused.
+ */
+export async function setDraftWriteBack(on: boolean): Promise<boolean> {
+  if (!draft) return false;
+  const ok = await draft.source.enableWriteBack(on);
+  if (on && !ok) toast('Monet was not given permission to write to that folder.', 'error');
+  changed();
+  return ok;
 }
 
 /** Pick the model JSON to open when a folder holds several. */

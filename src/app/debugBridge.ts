@@ -150,6 +150,8 @@ export function installDebugBridge(): void {
         id: m.id,
         name: m.name,
         format: m.format,
+        // Which source this model came from — several bundles can hold a model of the same name.
+        binding: m.binding ?? null,
         elements: m.elements.length,
         missing: m.missing,
         textures: Object.fromEntries(

@@ -246,11 +246,33 @@ unresolved reference, which can only be looked at.
 the model JSON as it now stands and each texture carrying the pixels currently on the model, at
 the asset paths Minecraft expects. The option only appears for models that came from a bundle.
 
+**Write-back** (owner request 2026-08-11), a toggle **defaulting OFF**: with it on, Ctrl+S on a
+bundle texture overwrites the file it was read from, so the folder route becomes a live editing
+session instead of an import/export round trip. Rules:
+
+- **Off by default, and the zip is the only way out until the user says otherwise.** The default
+  guarantee is that opening a folder in Monet does not modify anything in it.
+- **Only files actually read from the folder are ever overwritten.** A hand-picked PNG or a
+  placeholder has no home there, and inventing one would scatter files the user never asked for —
+  those still come out through the zip. `ModelBundleSource.onDisk` is that set.
+- **Needs real handles**, so it is offered only for the File System Access directory route;
+  `<input webkitdirectory>` yields Files, not handles, and the toggle is hidden.
+- **Permission is asked at toggle time, not save time**: the directory pick grants read only, so
+  turning it on calls `requestPermission({mode:'readwrite'})` and a refusal leaves it off with a
+  toast rather than failing later mid-save.
+- **Two places to change it**: the load dialog, and the source block in the Sources sidebar (which
+  also shows `· saving to folder` in its status line) so it can be turned on after loading.
+
 **Acceptance** (`model-bundle.mjs`): a two-texture model asks for exactly two textures; a
 supplied PNG matches the row that wanted it; the other takes the placeholder; the model opens
 with no unresolved references and renders; paint applied to the placeholder face comes back out
-inside the exported zip (decoded and checked, not byte-length guessed); and the folder route
-resolves its texture with nothing left to ask for.
+inside the exported zip (decoded and checked, not byte-length guessed); the folder route
+resolves its texture with nothing left to ask for; the write-back toggle appears for a
+handle-backed folder and starts off; a save with it off writes nothing to the folder; the sidebar
+toggle asks for permission and turns it on; and a save with it on overwrites the original PNG with
+the paint in it (decoded from the bytes the fake handle received). Unit side
+(`tests/modelBundle.test.ts`): default-off, permission-refused, never-invent-a-file, and
+no-toggle-without-handles.
 
 ---
 

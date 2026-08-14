@@ -252,4 +252,166 @@ export default async function ({ page, shot, log }) {
       : '✗ the folder model did not open cleanly',
   );
   await shot('6-folder-opened');
+
+  // ---- write-back: off by default, and when turned on it hits the real file -----------
+  // A fake directory handle tree, the way file-handler fakes file handles: showDirectoryPicker
+  // is the one thing a harness cannot drive, everything past it is the real code path.
+  await page.evaluate(
+    ([gearBytes, modelJsonText]) => {
+      const written = (window.__written = {});
+      const fileHandle = (name, path, bytes) => ({
+        kind: 'file',
+        name,
+        async getFile() {
+          return new File([new Uint8Array(bytes)], name);
+        },
+        async createWritable() {
+          return {
+            async write(data) {
+              const buf = data instanceof Blob ? new Uint8Array(await data.arrayBuffer()) : data;
+              written[path] = [...new Uint8Array(buf)];
+            },
+            async close() {},
+          };
+        },
+      });
+      const dir = (name, children) => ({
+        kind: 'directory',
+        name,
+        values() {
+          return (async function* () {
+            for (const c of children) yield c;
+          })();
+        },
+        async queryPermission() {
+          return 'prompt';
+        },
+        async requestPermission() {
+          window.__permissionAsked = true;
+          return 'granted';
+        },
+      });
+      const gearPngHandle = fileHandle(
+        'gear.png',
+        'assets/mymod/textures/block/gear.png',
+        gearBytes,
+      );
+      const modelHandle = fileHandle('gear.json', 'assets/mymod/models/block/gear.json', [
+        ...new TextEncoder().encode(modelJsonText),
+      ]);
+      window.showDirectoryPicker = async () =>
+        dir('pack', [
+          dir('assets', [
+            dir('mymod', [
+              dir('models', [dir('block', [modelHandle])]),
+              dir('textures', [dir('block', [gearPngHandle])]),
+            ]),
+          ]),
+        ]);
+    },
+    [gearPng, JSON.stringify(MODEL)],
+  );
+
+  await page.click('.topbar__menu');
+  await page.click('text=Open Minecraft model…');
+  await page.waitForTimeout(300);
+  await page.click('.dialog .btn:has-text("Choose the folder it lives in…")');
+  await page.waitForTimeout(900);
+
+  const toggle = page
+    .locator('.dialog .check:has-text("Save texture edits back")')
+    .locator('input');
+  log('write-back toggle present:', await toggle.count());
+  log(
+    (await toggle.count()) === 1 && !(await toggle.isChecked())
+      ? '✓ the write-back toggle is offered for a real folder and starts OFF'
+      : '✗ toggle missing or defaulted on',
+  );
+  await shot('7-writeback-off');
+
+  // Leave it OFF and open the model: the default must be "your files are not touched".
+  await page.click('.dialog__actions .btn--primary');
+  await page.waitForTimeout(1400);
+  const folderBundle = (await page.evaluate(() => window.__monet.model()))?.binding?.sourceId;
+  log('the folder-backed model is bound to source:', folderBundle);
+
+  /** The tab of the model we just opened. Three models called "gear" are open by now, so
+   *  pick the newest model tab (▣) rather than the first thing matching the name. */
+  const modelTab = () => page.locator('.doctab:has(.doctab__kind)').last();
+
+  const paintAndSave = async () => {
+    await page.keyboard.press('Digit1');
+    await page.waitForTimeout(250);
+    await page.keyboard.press('KeyB');
+    await page.locator('.colorpanel .swatches').first().locator('.swatch').nth(3).click(); // red
+    const b = await page.locator('.workspace--model .workspace__canvas').boundingBox();
+    await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(b.x + b.width / 2 + 15, b.y + b.height / 2, { steps: 5 });
+    await page.mouse.up();
+    await page.waitForTimeout(600);
+    await page.keyboard.press('Enter'); // open the texture behind the face I am looking at
+    await page.waitForTimeout(700);
+    await page.keyboard.press('Control+s');
+    await page.waitForTimeout(900);
+  };
+
+  await paintAndSave();
+  const writtenWhileOff = await page.evaluate(() => Object.keys(window.__written ?? {}));
+  log('files written with the toggle OFF:', JSON.stringify(writtenWhileOff));
+  log(
+    writtenWhileOff.length === 0
+      ? '✓ with write-back off, saving touched nothing in the folder'
+      : '✗ it wrote to the folder without being asked',
+  );
+
+  // Turn it on from the SOURCES sidebar — the toggle lives there too, so it can be changed
+  // after loading rather than only at the moment of opening.
+  const sidebarToggle = page
+    .locator('.srcblock__check:has-text("Save edits back to the folder")')
+    .locator('input');
+  log('sidebar toggle present:', await sidebarToggle.count());
+  await sidebarToggle.check();
+  await page.waitForTimeout(500);
+  log('permission requested:', await page.evaluate(() => !!window.__permissionAsked));
+  log(
+    (await page.evaluate(() => !!window.__permissionAsked)) && (await sidebarToggle.isChecked())
+      ? '✓ the sidebar toggle turns it on and asks for write permission first'
+      : '✗ sidebar toggle did not enable write-back',
+  );
+
+  // Paint again (the previous save cleared the dirty flag) and save for real this time.
+  await modelTab().click();
+  await page.waitForTimeout(400);
+  const backOn = (await page.evaluate(() => window.__monet.model()))?.binding?.sourceId;
+  log(
+    backOn === folderBundle
+      ? '✓ back on the folder-backed model'
+      : `✗ wrong model in focus (${backOn} ≠ ${folderBundle})`,
+  );
+  await paintAndSave();
+
+  const written = await page.evaluate(() => Object.keys(window.__written ?? {}));
+  log('files written to the folder:', JSON.stringify(written));
+  const redOnDisk = await page.evaluate(async () => {
+    const bytes = window.__written['assets/mymod/textures/block/gear.png'];
+    if (!bytes) return -1;
+    const bmp = await createImageBitmap(new Blob([new Uint8Array(bytes)], { type: 'image/png' }));
+    const c = new OffscreenCanvas(bmp.width, bmp.height);
+    const ctx = c.getContext('2d');
+    ctx.drawImage(bmp, 0, 0);
+    const { data } = ctx.getImageData(0, 0, bmp.width, bmp.height);
+    let red = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i] > 180 && data[i + 1] < 80 && data[i + 2] < 80) red++;
+    }
+    return red;
+  });
+  log('red pixels in the file on disk:', redOnDisk);
+  log(
+    written.includes('assets/mymod/textures/block/gear.png') && redOnDisk > 0
+      ? '✓ with it on, Ctrl+S overwrote the original PNG in the folder, paint included'
+      : '✗ nothing reached the folder',
+  );
+  await shot('8-writeback-on');
 }

@@ -14,6 +14,7 @@ import {
   openDraft,
   placeholderFor,
   placeholderForAll,
+  setDraftWriteBack,
   startBundleFromFiles,
   startBundleFromFolder,
   subscribeBundleDraft,
@@ -174,6 +175,27 @@ export function LoadModelDialog({ onClose }: { onClose(): void }) {
               Fill {missing || 'all'} missing with placeholder
             </button>
           </div>
+
+          {draft.source.canWriteBack() && (
+            <label
+              className="check"
+              title="Off by default: Monet keeps your files untouched and hands everything back through the zip"
+            >
+              <input
+                type="checkbox"
+                checked={draft.source.writeBack}
+                onChange={(e) => void setDraftWriteBack(e.target.checked)}
+              />
+              Save texture edits back to the folder
+            </label>
+          )}
+          {draft.source.writeBack && (
+            <p className="panel__hint">
+              Ctrl+S on a texture will overwrite the file it came from. Textures you added by hand
+              and placeholders have no file in that folder, so they stay in Monet — the zip is how
+              those come out.
+            </p>
+          )}
 
           {draft.needs.unresolved.length > 0 && (
             <p className="panel__hint">

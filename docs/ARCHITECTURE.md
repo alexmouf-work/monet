@@ -103,7 +103,9 @@ src/integrations/
   github/{oauth,auth}.ts               sign-in: pure flow helpers + session/refresh/installations
   jar/jarSource.ts                     jszip + IndexedDB cache, mcmeta badges
   fsa/{localFile,folderSource}.ts      pickers with download fallback; folder source
-  fsa/modelBundle.ts                   in-memory source for a user-supplied model + its textures
+  fsa/modelBundle.ts                   in-memory source for a user-supplied model + its textures;
+                                       keeps the folder's file handles so an edit can optionally
+                                       be written back to the file it came from (off by default)
   idb.ts                               idb-keyval wrappers + autosave store
 
 src/ui/                                React; no business logic
@@ -147,8 +149,9 @@ preview matrices, paused editing, slot edit → saved JSON) · `model3d-multi` (
 box-select, on-canvas outline count, one-step multi-move, filters) · `pixel-alignment` (clicks
 at pixel corners land on that pixel — the helpers aim at centres, where the bug hid) ·
 `relight` (the owner's match scenario end to end, mapping differences, hue invariance) ·
-`model-bundle` (open a model from local files, placeholder a missing texture, paint it, and get
-it all back in a zip). Fixture jars are built fresh each run by
+`model-bundle` (open a model from local files, placeholder a missing texture, paint it, get it
+all back in a zip, and write-back: off by default, then on from the sidebar, asserted by decoding
+the PNG a fake directory handle received). Fixture jars are built fresh each run by
 `tests/manual/fixtures/jar.mjs` (Node-side zip + hand-rolled PNG encoder) — nothing depends on
 leftover /tmp files. The harness launches Chromium with swiftshader flags so WebGL2 works
 headless.

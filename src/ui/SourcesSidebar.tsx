@@ -275,6 +275,7 @@ function SourceBlock({
 
       {open && (
         <>
+          <WriteBackToggle source={source} />
           <input
             className="srcblock__filter"
             type="text"
@@ -365,4 +366,29 @@ async function openTexture(source: SourceProvider, node: TextureNode): Promise<v
   } catch (err) {
     toast(`Could not open ${node.path}: ${(err as Error).message}`, 'error');
   }
+}
+
+/**
+ * Model bundles opened from a folder can save texture edits back to the files they came from
+ * (docs/11 §4.5). Off by default and per bundle: the toggle lives here so it can be changed
+ * after loading, not only in the dialog. `enableWriteBack` emits on the sources façade, which
+ * re-renders this whole sidebar — hence no local state.
+ */
+function WriteBackToggle({ source }: { source: SourceProvider }) {
+  const bundle = source as SourceProvider & {
+    canWriteBack?(): boolean;
+    writeBack?: boolean;
+    enableWriteBack?(on: boolean): Promise<boolean>;
+  };
+  if (!bundle.canWriteBack?.()) return null;
+  return (
+    <label className="check srcblock__check" title="Overwrite the original PNGs when you save">
+      <input
+        type="checkbox"
+        checked={!!bundle.writeBack}
+        onChange={(e) => void bundle.enableWriteBack?.(e.target.checked)}
+      />
+      Save edits back to the folder
+    </label>
+  );
 }
