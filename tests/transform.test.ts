@@ -7,6 +7,7 @@ import {
   resampleNearest,
   rotate90ACW,
   rotate90CW,
+  rotatePixels,
 } from '../src/core/raster/transform';
 import { emptyPixels, idx } from '../src/core/raster/pixels';
 
@@ -127,5 +128,94 @@ describe('recanvas', () => {
     expect(at(grown, 5, 4, 3)).toEqual([0, 0, 0, 0]); // padded transparent
     const shrunk = recanvas(src, 3, 3, 2, 2);
     expect(at(shrunk, 2, 1, 1)).toEqual([1, 1, 0, 255]);
+  });
+});
+
+describe('rotatePixels (free-angle selection rotation, docs/06 §4.1)', () => {
+  it('0° is a copy, not the same buffer', () => {
+    const src = coords(4, 3);
+    const out = rotatePixels(src, 4, 3, 0);
+    expect(out.w).toBe(4);
+    expect(out.h).toBe(3);
+    expect([...out.pixels]).toEqual([...src]);
+    expect(out.pixels).not.toBe(src);
+  });
+
+  it('right angles route to the exact transposes — lossless, and the box transposes', () => {
+    const src = coords(4, 3);
+    expect([...rotatePixels(src, 4, 3, 90).pixels]).toEqual([...rotate90CW(src, 4, 3)]);
+    expect([...rotatePixels(src, 4, 3, 270).pixels]).toEqual([...rotate90ACW(src, 4, 3)]);
+    expect(rotatePixels(src, 4, 3, 90)).toMatchObject({ w: 3, h: 4 });
+    expect([...rotatePixels(src, 4, 3, 180).pixels]).toEqual([...flipV(flipH(src, 4, 3), 4, 3)]);
+  });
+
+  it('normalises the angle: −90 = 270, 360 = 0, 450 = 90', () => {
+    const src = coords(4, 3);
+    expect([...rotatePixels(src, 4, 3, -90).pixels]).toEqual([
+      ...rotatePixels(src, 4, 3, 270).pixels,
+    ]);
+    expect([...rotatePixels(src, 4, 3, 360).pixels]).toEqual([...src]);
+    expect([...rotatePixels(src, 4, 3, 450).pixels]).toEqual([
+      ...rotatePixels(src, 4, 3, 90).pixels,
+    ]);
+  });
+
+  it('four 90° turns return the original exactly', () => {
+    const src = coords(5, 3);
+    let px: Uint8ClampedArray = src;
+    let w = 5;
+    let h = 3;
+    for (let i = 0; i < 4; i++) {
+      const r = rotatePixels(px, w, h, 90);
+      px = r.pixels;
+      w = r.w;
+      h = r.h;
+    }
+    expect(w).toBe(5);
+    expect(h).toBe(3);
+    expect([...px]).toEqual([...src]);
+  });
+
+  it('turns clockwise: the top edge ends up on the right', () => {
+    // A single opaque pixel at top-centre of a 3×3.
+    const src = emptyPixels(3, 3);
+    src.set([255, 0, 0, 255], idx(1, 0, 3));
+    const out = rotatePixels(src, 3, 3, 90);
+    expect(at(out.pixels, 3, 2, 1)).toEqual([255, 0, 0, 255]);
+  });
+
+  it('grows the bounding box for an off-axis angle and keeps the art inside it', () => {
+    const src = coords(8, 4);
+    const out = rotatePixels(src, 8, 4, 45);
+    // |8cos45| + |4sin45| ≈ 8.49 both ways.
+    expect(out.w).toBe(8);
+    expect(out.h).toBe(8);
+    expect(out.pixels.length).toBe(8 * 8 * 4);
+    // Rotation conserves area: nearest-neighbour can sample a source pixel more than once, so
+    // the count moves a little, but not by much.
+    let opaque = 0;
+    for (let i = 3; i < out.pixels.length; i += 4) if (out.pixels[i] > 0) opaque++;
+    expect(opaque).toBeGreaterThan(8 * 4 * 0.75);
+    expect(opaque).toBeLessThan(8 * 4 * 1.25);
+  });
+
+  it('leaves the corners of an off-axis rotation transparent rather than smeared', () => {
+    const src = emptyPixels(8, 8);
+    src.fill(255); // fully opaque white block
+    const out = rotatePixels(src, 8, 8, 45);
+    expect(at(out.pixels, out.w, 0, 0)[3]).toBe(0);
+    expect(at(out.pixels, out.w, out.w - 1, 0)[3]).toBe(0);
+    expect(at(out.pixels, out.w, Math.floor(out.w / 2), Math.floor(out.h / 2))[3]).toBe(255);
+  });
+
+  it('samples, never blends: every output pixel is one of the input colours', () => {
+    const src = emptyPixels(6, 6);
+    for (let i = 0; i < 6 * 6; i++) src.set(i % 2 ? [255, 0, 0, 255] : [0, 0, 255, 255], i * 4);
+    const out = rotatePixels(src, 6, 6, 30);
+    for (let i = 0; i < out.pixels.length; i += 4) {
+      if (out.pixels[i + 3] === 0) continue;
+      const rgb = [out.pixels[i], out.pixels[i + 1], out.pixels[i + 2]].join();
+      expect(['255,0,0', '0,0,255']).toContain(rgb);
+    }
   });
 });

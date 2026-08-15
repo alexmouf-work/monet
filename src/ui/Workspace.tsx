@@ -13,6 +13,11 @@ import { TextEditOverlay } from './TextEditOverlay';
 import { beginEditing } from '../tools/textTool';
 import { commitSplineNow, splineInProgress } from '../tools/shapeTool';
 import { selectedObject } from '../app/docStore';
+import { rotateFloat } from '../app/selectionActions';
+
+/** Degrees per wheel event: 15° a notch, 1° with Shift for a fine angle. Trackpads send many
+ *  small deltas, so the step is per EVENT and the sign is all that is read — matching zoom. */
+const rotationStep = (e: WheelEvent) => (e.deltaY > 0 ? 1 : -1) * (e.shiftKey ? 1 : 15);
 
 export function Workspace() {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -68,6 +73,13 @@ export function Workspace() {
       e.preventDefault();
       const doc = useDocStore.getState().active();
       if (!doc) return;
+      // With a selection live the wheel turns it instead of zooming (owner request
+      // 2026-08-11) — you cannot rotate what you cannot reach, and zoom is still on
+      // +/−, Ctrl+0/1 and the status bar. Esc drops the selection and hands the wheel back.
+      if (useDocStore.getState().selection) {
+        rotateFloat(rotationStep(e));
+        return;
+      }
       const r = canvas.getBoundingClientRect();
       useViewStore
         .getState()

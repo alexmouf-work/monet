@@ -110,8 +110,11 @@ hit an object → object transform mode; otherwise → **marquee**.
 interface SelectionState {
   rect: Rect;                                  // integer, clamped to doc
   floating?: {                                 // present once lifted
-    pixels: Uint8ClampedArray;                 // rect.w * rect.h * 4
+    pixels: Uint8ClampedArray;                 // w * h * 4, the TRANSFORMED result
+    w: number; h: number;                      // rotated bounding box
     x: number; y: number;                      // current top-left, doc space
+    source: { pixels: Uint8ClampedArray; w: number; h: number };   // as lifted
+    xform: { w; h; angle; flipX; flipY };      // §4.1 item 7 — flip, scale, rotate
   };
 }
 ```
@@ -143,6 +146,24 @@ interface SelectionState {
 6. **Scale**: the float shows 8 handles; dragging resizes it with **nearest**
    resampling from the originally-lifted pixels (never re-resample the
    resampled). `Shift` keeps aspect.
+7. **Rotate and flip** (owner request 2026-08-11), while the selection is still live:
+   **the wheel turns it** 15° a notch clockwise (`Shift` for 1°), and **`F` mirrors it**
+   across the horizontal axis — top↔bottom — with `Shift+F` for left↔right. Both act on a
+   plain marquee too by lifting it first, so "select, then turn it" needs no separate step.
+
+   - Held as a **description, not as pixels**: `FloatTransform = { w, h, angle, flipX, flipY }`
+     on the float, applied to `source` as flip → scale → rotate, rebuilt from the ORIGINAL lift
+     on every change. Twelve wheel notches therefore cost one resample rather than twelve, and
+     winding the wheel back returns the original pixels exactly.
+   - **Right angles are lossless**: 90/180/270 route to the exact transposes
+     (`rotate90CW`/`ACW`/flip pair), never to the general sampler. Off-axis angles inverse-map
+     nearest-neighbour into the grown bounding box — pixel art, so no interpolation.
+   - Rotation **keeps the centre fixed** and the marquee tracks the new bounding box; a float
+     that lurched sideways on every notch would be unusable.
+   - No undo step per notch: the float is uncommitted state, and anchoring is the one
+     undoable event (as for move and scale).
+   - Both keys are **conditional bindings** [09 §7]: with no selection, `F` is still the bucket
+     and the wheel is still the zoom.
 
 `Ctrl+A` selects the whole canvas. Selection state lives in `docStore.selection`
 (per active doc) and is **not** persisted into `.monet`.
@@ -211,6 +232,11 @@ noise/recolour/eraser can affect text & shapes (A2 hint links here).
 - Marquee: lift/move/anchor round-trip with undo at every step; deleting clears
   all raster layers but not objects; copy → paste in a second document carries
   exact pixels; crop shifts objects correctly.
+- Rotate/flip (`selection-transform.mjs`): a wheel notch lifts a plain marquee and turns it
+  rather than zooming; six notches transpose the box exactly and six back restore the original
+  pixels byte-for-byte; an off-axis angle grows the box and keeps the art; `F` mirrors an
+  asymmetric shape top↔bottom and `Shift+F` left↔right, without the bucket stealing the key;
+  the transformed pixels anchor into the layer; and with nothing selected the wheel zooms again.
 - Live editing (`live-edit.mjs`, all read off the **visible canvas** — "it is in the buffer"
   was true for every one of these while the screen disagreed): dragging a marquee carries the
   pixels to the new place on screen *before* the button comes up; clicking outside anchors

@@ -19,13 +19,13 @@ import {
   emptyPixels,
   normalizeRect,
 } from '../core/raster/pixels';
-import { resampleNearest } from '../core/raster/transform';
+import { flipH, flipV, resampleNearest, rotatePixels } from '../core/raster/transform';
 import { compositePixels, renderComposite } from '../engine/compose';
 import { drawObject } from '../engine/drawObjects';
 import { canvasToBlob, decodeImage } from '../engine/exporters';
 import { ctx2d, imageDataFrom, makeCanvas } from '../engine/layerCache';
 import { toast } from './bus';
-import { useDocStore, type FloatingSelection } from './docStore';
+import { useDocStore, type FloatingSelection, type FloatTransform } from './docStore';
 import { useViewStore } from './viewStore';
 import { getComposeOpts } from '../ui/sceneHooks';
 
@@ -76,9 +76,79 @@ export function liftSelection(): FloatingSelection | null {
     x: rect.x,
     y: rect.y,
     source: { pixels: new Uint8ClampedArray(pixels), w: rect.w, h: rect.h },
+    xform: identityXform(rect.w, rect.h),
   };
   ds.setSelection({ rect, floating });
   return floating;
+}
+
+export const identityXform = (w: number, h: number): FloatTransform => ({
+  w,
+  h,
+  angle: 0,
+  flipX: false,
+  flipY: false,
+});
+
+/**
+ * Rebuild a float's pixels from the ORIGINAL lift under a new transform — flip, scale, rotate,
+ * in that order — keeping its centre where it is, since rotating grows the bounding box and a
+ * float that lurched sideways on every wheel notch would be unusable.
+ */
+function withXform(f: FloatingSelection, patch: Partial<FloatTransform>): FloatingSelection {
+  const xform = { ...f.xform, ...patch };
+  let px = f.source.pixels;
+  let w = f.source.w;
+  let h = f.source.h;
+  if (xform.flipX) px = flipH(px, w, h);
+  if (xform.flipY) px = flipV(px, w, h);
+  if (xform.w !== w || xform.h !== h) {
+    px = resampleNearest(px, w, h, xform.w, xform.h);
+    w = xform.w;
+    h = xform.h;
+  }
+  const rotated = rotatePixels(px, w, h, xform.angle);
+  const cx = f.x + f.w / 2;
+  const cy = f.y + f.h / 2;
+  return {
+    ...f,
+    xform,
+    pixels: rotated.pixels,
+    w: rotated.w,
+    h: rotated.h,
+    x: Math.round(cx - rotated.w / 2),
+    y: Math.round(cy - rotated.h / 2),
+  };
+}
+
+/** Apply a transform patch to the float, lifting a plain marquee first if need be. */
+function transformFloat(patch: Partial<FloatTransform>): void {
+  const ds = useDocStore.getState();
+  const f = ds.selection?.floating ?? liftSelection();
+  if (!f) return;
+  const next = withXform(f, patch);
+  ds.setSelection({
+    rect: { x: next.x, y: next.y, w: next.w, h: next.h },
+    floating: next,
+  });
+}
+
+/**
+ * Turn the selection by `delta` degrees clockwise (owner request 2026-08-11: the wheel does
+ * this while a selection is live). Angles accumulate on the transform, never on the pixels, so
+ * a full turn returns the original art rather than a pile of resampling.
+ */
+export function rotateFloat(delta: number): void {
+  const f = useDocStore.getState().selection?.floating;
+  const from = f ? f.xform.angle : 0;
+  transformFloat({ angle: (((from + delta) % 360) + 360) % 360 });
+}
+
+/** Mirror the selection. `x` swaps left and right; `y` swaps top and bottom. */
+export function flipFloat(axis: 'x' | 'y'): void {
+  const f = useDocStore.getState().selection?.floating;
+  if (axis === 'x') transformFloat({ flipX: !(f?.xform.flipX ?? false) });
+  else transformFloat({ flipY: !(f?.xform.flipY ?? false) });
 }
 
 export function moveFloat(dx: number, dy: number): void {
@@ -108,13 +178,12 @@ export function resizeFloat(rect: Rect): void {
   const ds = useDocStore.getState();
   const sel = ds.selection;
   if (!sel?.floating) return;
-  const f = sel.floating;
   const w = Math.max(1, Math.round(rect.w));
   const h = Math.max(1, Math.round(rect.h));
-  const pixels = resampleNearest(f.source.pixels, f.source.w, f.source.h, w, h);
+  const next = withXform(sel.floating, { w, h });
   ds.setSelection({
-    rect: { x: Math.round(rect.x), y: Math.round(rect.y), w, h },
-    floating: { ...f, pixels, w, h, x: Math.round(rect.x), y: Math.round(rect.y) },
+    rect: { x: Math.round(rect.x), y: Math.round(rect.y), w: next.w, h: next.h },
+    floating: { ...next, x: Math.round(rect.x), y: Math.round(rect.y) },
   });
 }
 
@@ -371,6 +440,7 @@ async function pastePixels(data: { pixels: Uint8ClampedArray; w: number; h: numb
       x,
       y,
       source: { pixels: new Uint8ClampedArray(data.pixels), w: data.w, h: data.h },
+      xform: identityXform(data.w, data.h),
     },
   });
 }

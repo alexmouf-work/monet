@@ -39,6 +39,8 @@ export interface MonetDebug {
   stampOrigin(p: { x: number; y: number }, size: number): { x: number; y: number };
   /** Tight bounds of every non-transparent pixel in the raster layers, or null when empty. */
   layerBounds(): { x: number; y: number; w: number; h: number } | null;
+  /** The floating selection's own pixels, so a scenario can see a flip in the data. */
+  floatPixels(): { w: number; h: number; pixels: number[] } | null;
   pixelAt(x: number, y: number): [number, number, number, number] | null;
   /** Renderer frame costs since the last `resetPerf()` — the perf scenario's measuring stick. */
   perf(): { frames: number; totalMs: number; avgMs: number; maxMs: number; composites: number };
@@ -158,6 +160,10 @@ export function installDebugBridge(): void {
         }
       }
       return count;
+    },
+    floatPixels() {
+      const f = useDocStore.getState().selection?.floating;
+      return f ? { w: f.w, h: f.h, pixels: Array.from(f.pixels) } : null;
     },
     brushOutline: () => brushOutlineRect(),
     stampOrigin: (p, size) => tipOrigin(p, size),

@@ -168,6 +168,56 @@ export function flipV(src: Uint8ClampedArray, w: number, h: number): Uint8Clampe
   return out;
 }
 
+/**
+ * Rotation by an arbitrary angle, clockwise, into a buffer sized to the rotated bounding box —
+ * docs/06 §4.1. Nearest-neighbour, because this rotates pixel art: interpolation would soften
+ * every texel edge, and a Minecraft texture has nothing to spare.
+ *
+ * Right angles are routed to the exact transposes, so 90/180/270 are lossless and reversible
+ * rather than "resampled and nearly right". Everything else inverse-maps each destination
+ * pixel back through the rotation and samples once; pixels landing outside stay transparent.
+ */
+export function rotatePixels(
+  src: Uint8ClampedArray,
+  w: number,
+  h: number,
+  degrees: number,
+): { pixels: Uint8ClampedArray; w: number; h: number } {
+  const deg = ((degrees % 360) + 360) % 360;
+  if (deg === 0) return { pixels: new Uint8ClampedArray(src), w, h };
+  if (deg === 90) return { pixels: rotate90CW(src, w, h), w: h, h: w };
+  if (deg === 270) return { pixels: rotate90ACW(src, w, h), w: h, h: w };
+  if (deg === 180) return { pixels: flipV(flipH(src, w, h), w, h), w, h };
+
+  const rad = (deg * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  const dw = Math.max(1, Math.round(Math.abs(w * cos) + Math.abs(h * sin)));
+  const dh = Math.max(1, Math.round(Math.abs(w * sin) + Math.abs(h * cos)));
+  const out = emptyPixels(dw, dh);
+  const scx = w / 2;
+  const scy = h / 2;
+  const dcx = dw / 2;
+  const dcy = dh / 2;
+  for (let y = 0; y < dh; y++) {
+    const ry = y + 0.5 - dcy;
+    for (let x = 0; x < dw; x++) {
+      const rx = x + 0.5 - dcx;
+      // Inverse of the clockwise rotation (y points down, so +sin is clockwise).
+      const sx = Math.floor(rx * cos + ry * sin + scx);
+      const sy = Math.floor(-rx * sin + ry * cos + scy);
+      if (sx < 0 || sy < 0 || sx >= w || sy >= h) continue;
+      const s = idx(sx, sy, w);
+      const d = idx(x, y, dw);
+      out[d] = src[s];
+      out[d + 1] = src[s + 1];
+      out[d + 2] = src[s + 2];
+      out[d + 3] = src[s + 3];
+    }
+  }
+  return { pixels: out, w: dw, h: dh };
+}
+
 export const cropRect = (src: Uint8ClampedArray, sw: number, rect: Rect) => {
   const out = emptyPixels(rect.w, rect.h);
   for (let y = 0; y < rect.h; y++) {

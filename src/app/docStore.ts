@@ -13,14 +13,33 @@ import type { ModelCommand } from '../core/model3d/commands';
 import { invalidateDoc, patchLayer } from '../engine/layerCache';
 import { invalidate } from './bus';
 
+/**
+ * How the lifted pixels are being transformed, applied to `source` in this order: flip, scale
+ * to (w,h), then rotate. Held as a description rather than as accumulated pixels so that every
+ * change rebuilds from the ORIGINAL lift — twelve wheel notches cost one resample, not twelve
+ * (docs/06 §4.1).
+ */
+export interface FloatTransform {
+  /** Size the source is resampled to before rotating — what the resize handles set. */
+  w: number;
+  h: number;
+  /** Clockwise degrees, 0–360. */
+  angle: number;
+  /** Mirrored left↔right / top↔bottom. */
+  flipX: boolean;
+  flipY: boolean;
+}
+
 export interface FloatingSelection {
   pixels: Uint8ClampedArray;
+  /** Size of `pixels` — the rotated bounding box, so it grows off the right angles. */
   w: number;
   h: number;
   x: number;
   y: number;
   /** Pixels as originally lifted, so repeated scaling never compounds resampling. */
   source: { pixels: Uint8ClampedArray; w: number; h: number };
+  xform: FloatTransform;
 }
 
 export interface SelectionState {

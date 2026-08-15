@@ -38,6 +38,8 @@ api/github/token.ts                    THE only server-side code: GitHub App tok
 src/core/                              PURE: no DOM, no React, all unit-tested
   model/{types,document,commands}.ts   canonical shapes, auto-layering, undo commands
   raster/{pixels,stamp,floodfill,transform,crisp}.ts
+                                       transform.ts also rotates by a free angle; right
+                                       angles route to the exact transposes (lossless)
   color/{convert,palette}.ts           HSL/HSV/hex, MS-Paint 20
   shapes/{geometry,spline,transformOps}.ts  contours, Catmull-Rom, handle scaling
   noise/{fields,apply}.ts              13 fields from one hash, brightness/hue apply
@@ -156,7 +158,9 @@ at pixel corners land on that pixel — the helpers aim at centres, where the bu
 two-shades-of-green swap coming out as two shades of purple) ·
 `model-bundle` (open a model from local files, placeholder a missing texture, paint it, get it
 all back in a zip, and write-back: off by default, then on from the sidebar, asserted by decoding
-the PNG a fake directory handle received) · `live-edit` (the four 2026-08-11 owner reports, every
+the PNG a fake directory handle received) · `selection-transform` (wheel rotates a live selection, F/Shift+F mirror it, a 90° round trip
+returns the original pixels, and the wheel is the zoom again once nothing is selected) ·
+`live-edit` (the four 2026-08-11 owner reports, every
 check read off the VISIBLE canvas rather than the document: outline == painted bounds, stroke and
 erase visible mid-drag, a dragged selection arriving at its new place, click-outside anchoring,
 one copy after cut+paste, bare background staying transparent). Fixture jars are built fresh each run by

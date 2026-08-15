@@ -8,7 +8,7 @@ import { frameModel, openLookedAtTexture, snapView, updateCamera } from './Model
 import { lastPaintedDoc } from '../tools/modelPaint';
 import { addCube, deleteSelectedElement, duplicateSelectedElement } from '../app/modelEditActions';
 import { nudgeSelected } from '../tools/selectTool';
-import { anchorSelection } from '../app/selectionActions';
+import { anchorSelection, flipFloat } from '../app/selectionActions';
 import { isTypingTarget } from './Workspace';
 
 export interface ShortcutActions {
@@ -319,6 +319,16 @@ export function useShortcuts(actions: ShortcutActions) {
         case 'BracketRight':
           ts.nudgeSize(1);
           return;
+        case 'KeyF':
+          // Flip the selection while there is one (owner request 2026-08-11) — `F` keeps its
+          // usual meaning (the bucket) the rest of the time, and Esc hands it back.
+          // Unshifted mirrors across the horizontal axis (top↔bottom); Shift does the other.
+          if (ds.selection) {
+            e.preventDefault();
+            flipFloat(e.shiftKey ? 'x' : 'y');
+            return;
+          }
+          break;
         case 'KeyG':
           vs.cycleGrid();
           return;
