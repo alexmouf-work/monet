@@ -124,11 +124,19 @@ interface SelectionState {
    layers only** within the rect ([A2]; objects render above/below unaffected);
    every raster layer's rect region is cleared (`FloatCommand`, undoable).
 3. **Move**: dragging the float updates `x,y` (arrow keys nudge 1 px / `Shift`
-   10 px). The renderer draws the float above the whole stack.
+   10 px). The renderer draws the float above the whole stack — **as content**: the float is
+   composited (pipeline step 6, [01 §4]), so every change to it needs `invalidate()`, not
+   `invalidate(false)`. Treating a float move as chrome left the pixels rendered at their old
+   place while the marquee moved on its own, which reads as "the selection cannot be dragged"
+   (owner report 2026-08-11; `docStore.setSelection` now picks the level by whether either the
+   old or the new selection is floating).
 4. **Anchor**: `Esc`, `Enter`, clicking outside, switching tools, or starting any
    brush stroke anchors: float composites (`blendOver`) into the **top raster
    layer** (Rule 1 — created if the top item is an object) via `AnchorCommand`.
-   Selection clears.
+   Selection clears. *Order matters*: the select tool must anchor **before** it clears the
+   object selection, since `selectObject(null)` also clears `selection` — checking afterwards
+   meant the branch never ran and clicking outside a moved float silently destroyed the lifted
+   pixels (fixed 2026-08-11).
 5. **Delete** (`Del`): with a float → discard it (`AnchorCommand` variant that
    restores nothing); without → clear the rect in all raster layers
    (`StrokeCommand`).
@@ -144,6 +152,14 @@ interface SelectionState {
 - **Copy `Ctrl+C`** — rect (or float) → PNG via an offscreen →
   `navigator.clipboard.write([new ClipboardItem({'image/png': blob})])`, plus an
   internal in-memory copy (fallback when clipboard permissions fail).
+  - **Never the background.** A marquee copies what you see *in the stack* —
+    `includeBackground: false` — because the background is a document property, not content.
+    Including it made every copied block fully opaque, so dropping one anywhere stamped a
+    solid rectangle over the art underneath: the owner's "transparent pixels act like an
+    eraser" (2026-08-11).
+  - The bytes written to the system clipboard are remembered for **every** copy, not only for
+    objects, so a paste can recognise its own PNG and use the in-memory copy instead — a
+    clipboard round trip is free to flatten alpha, and the in-memory pixels never are.
 - **Objects copy too** (owner request 2026-08-09). With a shape or text object
   selected and **no** marquee, copy/cut takes the *object*: an internal object
   clipboard holds a `cloneItem`, so paste recreates a live, still-editable item
@@ -156,7 +172,13 @@ interface SelectionState {
     just size; a `paste` event carrying an outside image clears the object clipboard.
   - Cut of an object = copy + `RemoveItemsCommand` (one undo step).
 - **Cut `Ctrl+X`** (pixels) — copy + lift-then-discard (one undo step).
-- **Paste `Ctrl+V`** — `navigator.clipboard.read()` (fallback: `paste` event, then
+- **Paste `Ctrl+V`** — **single-flight**: `Ctrl+V` reaches the app twice, once from the
+  shortcut table and once from the browser's own `paste` event, and reading the async
+  clipboard is slow enough that both used to be in flight together. Each dropped its own
+  float and the second anchored the first, leaving **two copies** of what was cut (owner
+  report 2026-08-11). A paste already running is joined, not restarted, and the `paste`
+  event pastes its own payload directly rather than re-entering the clipboard read.
+  `navigator.clipboard.read()` (fallback: `paste` event, then
   internal copy); decode PNG → new floating selection centred in the viewport
   (clamped inside the doc; images larger than the doc are pasted un-scaled and can
   be moved/anchored — they crop on anchor). Pasting with no document open creates
@@ -189,5 +211,11 @@ noise/recolour/eraser can affect text & shapes (A2 hint links here).
 - Marquee: lift/move/anchor round-trip with undo at every step; deleting clears
   all raster layers but not objects; copy → paste in a second document carries
   exact pixels; crop shifts objects correctly.
+- Live editing (`live-edit.mjs`, all read off the **visible canvas** — "it is in the buffer"
+  was true for every one of these while the screen disagreed): dragging a marquee carries the
+  pixels to the new place on screen *before* the button comes up; clicking outside anchors
+  them instead of discarding them; a paste is drawn, not merely outlined; cut → paste →
+  anchor leaves exactly one copy; and a block of bare background dropped on artwork leaves
+  that artwork intact.
 - Flatten of the owner scenario stack produces a single layer whose composite is
   pixel-identical to the pre-flatten render.

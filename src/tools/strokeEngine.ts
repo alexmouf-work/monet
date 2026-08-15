@@ -163,7 +163,10 @@ function paintOverlay() {
     }
   }
   ctx2d(live.canvas).putImageData(imageDataFrom(buf, r.w, r.h), r.x, r.y);
-  invalidate(false);
+  // Content, not screen-space: the overlay is drawn INSIDE the composite (compose.ts), so a
+  // `false` here left the cached composite untouched and the stroke only appeared on
+  // pointer-up — the owner's "I cannot see what I am drawing" (2026-08-11).
+  invalidate();
 }
 
 function clampToDoc(r: Rect | null, w: number, h: number): Rect | null {

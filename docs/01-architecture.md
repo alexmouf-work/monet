@@ -183,6 +183,26 @@ One visible `<canvas>` fills the workspace. `engine/renderer.ts` owns a
 `requestAnimationFrame` loop gated by an `invalidate()` flag — **draw only when
 something changed** (state mutation, pointer move with a tool, view change).
 
+**`invalidate(content)` has two levels, and the split is by WHERE a thing is drawn, not by
+how permanent it is** (clarified 2026-08-11 after three owner-visible bugs came from getting
+it wrong):
+
+| level | meaning | for |
+| ----- | ------- | --- |
+| `invalidate()` | rebuild the cached composite, then blit | anything drawn in steps 3–6 below |
+| `invalidate(false)` | blit the cached composite, redraw overlays | step 7 only |
+
+Steps 3–6 include the *in-progress* things — the live stroke overlay and the floating
+selection. They are composited, not overlaid, so a change to either is CONTENT even though
+nothing has been committed to the document yet. Using `false` for them left the cached
+composite stale, which is why a stroke appeared only on pointer-up and a dragged or pasted
+selection showed as a marquee outline with no pixels in it. Screen-space chrome — brush tip
+outline, marquee ants, object handles, hover cursor, the shape tool's drag rectangle, tool
+and colour changes — is step 7 and stays `false`. See ARCHITECTURE.md § *Invalidation*.
+
+A live stroke therefore recomposites once per frame. Measured (`perf.mjs`, software GL):
+512², 60-step stroke = 61 composites, avg 0.65 ms, worst frame 2.5 ms.
+
 Per frame, with `view = { zoom, panX, panY }` (§ [06 §6]) and DPR handled by sizing
 the canvas backing store to `cssSize × devicePixelRatio`:
 

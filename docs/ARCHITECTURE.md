@@ -64,7 +64,8 @@ src/engine3d/glRenderer.ts             raw WebGL2 viewport (D11.1): mesh+line pr
 
 src/engine/                            DOM-facing rendering
   renderer.ts                          rAF loop gated on invalidate; surround, checker,
-                                       grid, 3×3 tiling, overlays
+                                       grid, 3×3 tiling, overlays. invalidate(true) =
+                                       recomposite, invalidate(false) = chrome only
   compose.ts                           the compositor (shared by viewport, export, flatten)
   layerCache.ts                        layer id → canvas cache + imageDataFrom
   drawObjects.ts paths.ts textLayout.ts objectChrome.ts hitTest.ts
@@ -151,7 +152,10 @@ at pixel corners land on that pixel — the helpers aim at centres, where the bu
 `relight` (the owner's match scenario end to end, mapping differences, hue invariance) ·
 `model-bundle` (open a model from local files, placeholder a missing texture, paint it, get it
 all back in a zip, and write-back: off by default, then on from the sidebar, asserted by decoding
-the PNG a fake directory handle received). Fixture jars are built fresh each run by
+the PNG a fake directory handle received) · `live-edit` (the four 2026-08-11 owner reports, every
+check read off the VISIBLE canvas rather than the document: outline == painted bounds, stroke and
+erase visible mid-drag, a dragged selection arriving at its new place, click-outside anchoring,
+one copy after cut+paste, bare background staying transparent). Fixture jars are built fresh each run by
 `tests/manual/fixtures/jar.mjs` (Node-side zip + hand-rolled PNG encoder) — nothing depends on
 leftover /tmp files. The harness launches Chromium with swiftshader flags so WebGL2 works
 headless.
@@ -257,6 +261,16 @@ synthetic `pointermove`s — Playwright's own mouse is paced far slower than a r
 mouse, so only the synthetic loop exposes per-event work. Frame timings measure CPU-side
 submission, not GPU rasterisation.
 
+- **`invalidate(content)` is chosen by where a thing is DRAWN, not by whether it is
+  committed.** `invalidate()` rebuilds the cached composite; `invalidate(false)` only blits it
+  and redraws screen-space chrome. The live stroke overlay and the floating selection are
+  *composited* (compose.ts draws both inside `drawDocument`), so they are content even while
+  in progress — using `false` for them left the cached composite stale and the screen showed a
+  stroke that appeared on pointer-up and a paste that was a marquee outline with nothing in it
+  (three owner reports, 2026-08-11). Chrome that genuinely is `false`: brush tip outline,
+  marquee ants, object handles, shape drag rect, hover cursor, tool/colour changes. Cost of
+  getting this right: 512², 60-step stroke = 61 composites, avg 0.65 ms, worst frame 2.5 ms —
+  and pan/zoom still do zero composites.
 - **`willReadFrequently` only on canvases we read back.** It requests a CPU-backed surface;
   on the visible canvas it costs GPU acceleration for every frame. `ctx2d` (readback) vs
   `ctx2dDraw` (draw-only, used for the on-screen canvas).

@@ -128,9 +128,17 @@ Record `before`/`after` crops of `dirty` per layer into the `StrokeCommand`, pat
   `globalCompositeOperation='destination-out'` + draw `scratchCanvas`, then blit the
   temp. (Simple, correct; canvases are tiny.)
 - Brush cursor: `drawOverlay` draws the tip outline (circle/square of
-  `size × zoom`) centred on the cursor, 1-px black + 1-px white double outline.
-  The CSS cursor stays `crosshair`, **not** `none` — the outline supplements the
-  pointer, it does not replace it [09 §8].
+  `size × zoom`) at **`tipOrigin(hover, size)` — the same function the stamp goes through**,
+  never its own arithmetic. 1-px black + 1-px white double outline. The CSS cursor stays
+  `crosshair`, **not** `none` — the outline supplements the pointer, it does not replace it
+  [09 §8].
+
+  The outline had its own `round(hover) - floor(size/2)`, which disagreed with the stamp past
+  a pixel's midpoint (round vs floor) and again on every even size (`floor(size/2)` vs
+  `floor((size-1)/2)`), so the highlighted pixel was not the painted one — owner-reported
+  2026-08-11, a second sighting of the §2 bug from the preview side. Two expressions of one
+  rule will drift; there is now one. `live-edit.mjs` asserts outline == painted bounds for
+  sizes 1–5 at fractional cursor positions.
 
 ## 4. Marker tip (graded)
 

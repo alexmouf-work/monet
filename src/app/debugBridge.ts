@@ -18,6 +18,8 @@ import { projMatrix, viewMatrix } from '../core/model3d/camera';
 import { multiply, transformPoint } from '../core/model3d/vec';
 import { getComposeOpts } from '../ui/sceneHooks';
 import { editingTextId } from '../tools/textTool';
+import { brushOutlineRect } from '../tools/brushTools';
+import { tipOrigin } from '../core/raster/stamp';
 
 export interface MonetDebug {
   doc(): unknown;
@@ -26,6 +28,17 @@ export interface MonetDebug {
   editingTextId(): number | null;
   /** Count of pixels matching a hex colour (± tolerance) in the flattened composite. */
   countColor(hex: string, tolerance?: number): number;
+  /**
+   * Same count, but over the RASTER LAYERS ALONE — no background, no floating selection, no
+   * live stroke overlay. "What is really in the document" as against "what is on screen".
+   */
+  layerColorCount(hex: string, tolerance?: number): number;
+  /** Doc-space rect the brush tool is outlining under the cursor, or null when not hovering. */
+  brushOutline(): { x: number; y: number; size: number } | null;
+  /** Where the stroke engine would put that tip — the outline must agree with this. */
+  stampOrigin(p: { x: number; y: number }, size: number): { x: number; y: number };
+  /** Tight bounds of every non-transparent pixel in the raster layers, or null when empty. */
+  layerBounds(): { x: number; y: number; w: number; h: number } | null;
   pixelAt(x: number, y: number): [number, number, number, number] | null;
   /** Renderer frame costs since the last `resetPerf()` — the perf scenario's measuring stick. */
   perf(): { frames: number; totalMs: number; avgMs: number; maxMs: number; composites: number };
@@ -122,6 +135,52 @@ export function installDebugBridge(): void {
           count++;
       }
       return count;
+    },
+    layerColorCount(hex, tolerance = 8) {
+      const d = useDocStore.getState().active();
+      if (!d) return 0;
+      const n = parseInt(hex.replace('#', ''), 16);
+      const r = (n >> 16) & 255;
+      const g = (n >> 8) & 255;
+      const b = n & 255;
+      let count = 0;
+      for (const item of d.stack) {
+        if (item.kind !== 'raster') continue;
+        const px = item.pixels;
+        for (let i = 0; i < px.length; i += 4) {
+          if (px[i + 3] < 128) continue;
+          if (
+            Math.abs(px[i] - r) <= tolerance &&
+            Math.abs(px[i + 1] - g) <= tolerance &&
+            Math.abs(px[i + 2] - b) <= tolerance
+          )
+            count++;
+        }
+      }
+      return count;
+    },
+    brushOutline: () => brushOutlineRect(),
+    stampOrigin: (p, size) => tipOrigin(p, size),
+    layerBounds() {
+      const d = useDocStore.getState().active();
+      if (!d) return null;
+      let x0 = d.width;
+      let y0 = d.height;
+      let x1 = -1;
+      let y1 = -1;
+      for (const item of d.stack) {
+        if (item.kind !== 'raster') continue;
+        for (let y = 0; y < d.height; y++) {
+          for (let x = 0; x < d.width; x++) {
+            if (item.pixels[(y * d.width + x) * 4 + 3] === 0) continue;
+            if (x < x0) x0 = x;
+            if (y < y0) y0 = y;
+            if (x > x1) x1 = x;
+            if (y > y1) y1 = y;
+          }
+        }
+      }
+      return x1 < 0 ? null : { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
     },
     perf() {
       const s = activeRenderer()?.stats;

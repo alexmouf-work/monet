@@ -115,7 +115,10 @@ export default async function ({ page, ui, state, log, shot }) {
   });
 
   await ui.tab('Brushes');
-  await ui.tool('Eyedropper');
+  // The eyedropper lives in the colour panel, not the tool grid (owner directive) — `I` is the
+  // shortcut for it. Clicking a "Eyedropper" tool button here hung the scenario until 2026-08-11.
+  await page.keyboard.press('KeyI');
+  await page.waitForTimeout(120);
   await measure('eyedropper drag (40)', state, log, async () => {
     await page.mouse.move(a.x, a.y);
     await page.mouse.down();
@@ -129,6 +132,28 @@ export default async function ({ page, ui, state, log, shot }) {
   await handlerCost('eyedropper handlers', page, log);
   await page.mouse.up();
   await page.waitForTimeout(120);
+
+  // The biggest preset, because a live stroke preview now recomposites per frame (the fix for
+  // "I cannot see what I am drawing"): this is the number that says whether that is affordable.
+  await ui.newDoc(512);
+  await ui.tab('Brushes');
+  await ui.tool('Pixel pen');
+  await ui.paletteColor(3);
+  await ui.setNumber('Size', 6);
+  const big = await measure('stroke on 512² (60 steps)', state, log, async () => {
+    const p = await ui.atDoc(20, 20);
+    const q = await ui.atDoc(480, 420);
+    await page.mouse.move(p.x, p.y);
+    await page.mouse.down();
+    await page.mouse.move(q.x, q.y, { steps: 60 });
+    await page.mouse.up();
+    await page.waitForTimeout(120);
+  });
+  log(
+    big.maxMs < 16
+      ? '✓ live stroke frames stay inside a 60fps budget at the largest preset'
+      : `✗ ${big.maxMs}ms worst frame — the live preview costs more than a frame`,
+  );
 
   // The wheel handler must be able to cancel the page's own scroll, or the workspace
   // scrolls under the cursor while zooming.

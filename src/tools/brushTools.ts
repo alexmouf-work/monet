@@ -3,6 +3,7 @@ import { invalidate } from '../app/bus';
 import { useDocStore } from '../app/docStore';
 import { useToolStore, type BrushSettings } from '../app/toolStore';
 import { screenFromDoc, type View } from '../engine/viewport';
+import { tipOrigin } from '../core/raster/stamp';
 import { beginStroke, endStroke, extendStroke, strokeActive } from './strokeEngine';
 import type { Tool, ToolPointerEvent } from './types';
 
@@ -17,6 +18,20 @@ function settings(id: 'pen' | 'marker' | 'eraser'): BrushSettings {
   return useToolStore.getState()[id];
 }
 
+/**
+ * The doc-space footprint the tip would stamp right now, or null when not hovering. The
+ * outline MUST come from `tipOrigin` — the same function the stroke engine stamps through.
+ * It used to do its own `Math.round(hover) - floor(size/2)`, which disagreed with the stamp
+ * past a pixel's midpoint and again on every even size, so the highlighted pixel was not the
+ * painted one (owner report 2026-08-11).
+ */
+export function brushOutlineRect(): { x: number; y: number; size: number } | null {
+  const id = useToolStore.getState().active;
+  if (!hover || (id !== 'pen' && id !== 'marker' && id !== 'eraser')) return null;
+  const { size } = settings(id);
+  return { ...tipOrigin(hover, size), size };
+}
+
 function drawTipOutline(
   ctx: CanvasRenderingContext2D,
   view: View,
@@ -24,9 +39,7 @@ function drawTipOutline(
 ) {
   if (!hover) return;
   const { size, tip } = settings(id);
-  const half = Math.floor(size / 2);
-  const originDoc = { x: Math.round(hover.x) - half, y: Math.round(hover.y) - half };
-  const p = screenFromDoc(view, originDoc);
+  const p = screenFromDoc(view, tipOrigin(hover, size));
   const s = size * view.zoom;
 
   ctx.save();

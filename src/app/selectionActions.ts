@@ -235,8 +235,9 @@ function selectionPixels(): { pixels: Uint8ClampedArray; w: number; h: number } 
   }
   const rect = sel ? clampRect(sel.rect, doc.width, doc.height) : null;
   if (rect && rect.w > 0 && rect.h > 0) {
-    // Copy what you see inside the marquee, objects included.
-    const full = compositePixels(doc, getComposeOpts());
+    // Copy what you see inside the marquee, objects included — but NOT the background, which
+    // would make every copied block opaque and stamp a rectangle over whatever it lands on.
+    const full = compositePixels(doc, { ...getComposeOpts(), includeBackground: false });
     return { pixels: copyRect(full, doc.width, rect), w: rect.w, h: rect.h };
   }
   return null;
@@ -264,8 +265,12 @@ export async function copySelection(): Promise<void> {
     const ok = await withTimeout(
       navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]),
     );
-    // Remember what we wrote so paste can recognise its own PNG and restore the live object.
-    if (ok !== null && objectClipboard) wroteToSystem = new Uint8Array(await blob.arrayBuffer());
+    // Remember what we wrote so paste can recognise its own PNG. For an object that restores
+    // the live item; for pixels it keeps our own un-premultiplied alpha, because a PNG that
+    // has been through the system clipboard can come back with transparency flattened —
+    // which is what made a pasted block erase whatever was behind it (owner report
+    // 2026-08-11).
+    if (ok !== null) wroteToSystem = new Uint8Array(await blob.arrayBuffer());
   } catch {
     /* no system clipboard here */
   }
@@ -288,7 +293,20 @@ export async function cutSelection(): Promise<void> {
   ds.setSelection(null);
 }
 
-export async function pasteClipboard(): Promise<void> {
+/**
+ * One paste at a time. Ctrl+V reaches this twice — once from the shortcut table and once from
+ * the browser's own `paste` event — and because reading the async clipboard is slow, both were
+ * in flight together and each dropped its own float: the second paste anchored the first, and
+ * the user was left with two copies of what they cut (owner report 2026-08-11).
+ */
+let pasting: Promise<void> | null = null;
+
+export function pasteClipboard(): Promise<void> {
+  pasting ??= runPaste().finally(() => (pasting = null));
+  return pasting;
+}
+
+async function runPaste(): Promise<void> {
   let data = internalClipboard;
   let object = objectClipboard;
   try {
@@ -297,9 +315,11 @@ export async function pasteClipboard(): Promise<void> {
       const type = item.types.find((t) => t.startsWith('image/'));
       if (!type) continue;
       const blob = await item.getType(type);
-      // Our own PNG still on the system clipboard: paste the live object it came from, not a
-      // flattened copy of it. Anything else outranks the internal clipboard.
-      if (object && (await sameAsOurCopy(blob))) break;
+      // Our own PNG still on the system clipboard: use what we hold rather than the blob. For
+      // an object that restores the live item; for pixels it keeps the exact alpha we copied,
+      // since a clipboard round trip can flatten transparency. Anything else outranks the
+      // internal clipboard.
+      if (await sameAsOurCopy(blob)) break;
       object = null;
       const decoded = await decodeImage(blob);
       data = { pixels: decoded.pixels, w: decoded.width, h: decoded.height };
@@ -317,7 +337,11 @@ export async function pasteClipboard(): Promise<void> {
     toast('Clipboard has no image to paste.');
     return;
   }
+  await pastePixels(data);
+}
 
+/** Drop a block of pixels in as a floating selection, centred on the visible viewport. */
+async function pastePixels(data: { pixels: Uint8ClampedArray; w: number; h: number }) {
   const ds = useDocStore.getState();
   let doc = ds.active();
   if (!doc) {
@@ -374,18 +398,32 @@ function pasteObject(source: ObjectItem): void {
   ds.selectObject(copy.id);
 }
 
-/** Called from a paste event when the async clipboard API is unavailable. */
+/**
+ * Called from the browser's own paste event. Ctrl+V fires this AND the shortcut table, so it
+ * must not start a second paste: it joins the one already running, and only pastes itself when
+ * it got there first (the shortcut is suppressed, or the paste came from a menu).
+ */
 export async function pasteFromEvent(e: ClipboardEvent): Promise<boolean> {
   const file = [...(e.clipboardData?.items ?? [])]
     .find((i) => i.type.startsWith('image/'))
     ?.getAsFile();
   if (!file) return false;
+  if (pasting) {
+    await pasting;
+    return true;
+  }
+  // Our own image coming back round: paste what we hold, with its alpha intact.
+  if (await sameAsOurCopy(file)) {
+    await pasteClipboard();
+    return true;
+  }
   const decoded = await decodeImage(file);
   internalClipboard = { pixels: decoded.pixels, w: decoded.width, h: decoded.height };
   // This image came from outside, so any object we were holding is no longer what to paste.
   objectClipboard = null;
   wroteToSystem = null;
-  await pasteClipboard();
+  pasting = pastePixels(internalClipboard).finally(() => (pasting = null));
+  await pasting;
   return true;
 }
 

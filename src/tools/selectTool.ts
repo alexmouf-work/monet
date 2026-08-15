@@ -138,9 +138,11 @@ export const selectTool: Tool = {
       return;
     }
 
-    ds.selectObject(null);
-    // Clicking outside a float anchors it before starting a new marquee.
+    // Clicking outside a float anchors it before starting a new marquee. This MUST come
+    // before selectObject(null), which clears `selection` — checking afterwards meant the
+    // condition was never true and the lifted pixels were dropped on the floor.
     if (ds.selection?.floating) anchorSelection();
+    ds.selectObject(null);
     beginMarquee(e.doc);
   },
 

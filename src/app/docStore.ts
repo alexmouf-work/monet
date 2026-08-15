@@ -444,13 +444,19 @@ export const useDocStore = create<DocState>((set, get) => ({
   },
 
   setSelection(s) {
+    // A floating selection is composited into the document (compose.ts), so moving, resizing
+    // or dropping one changes CONTENT. Only a plain marquee is pure screen-space chrome —
+    // treating every selection change as chrome made a dragged float invisible until some
+    // unrelated edit forced a recomposite (owner report 2026-08-11).
+    const wasFloating = !!get().selection?.floating;
     set({ selection: s });
-    get().bump(false);
+    get().bump(wasFloating || !!s?.floating);
   },
 
   selectObject(id) {
+    const wasFloating = !!get().selection?.floating;
     set({ selectedObjectId: id, selection: null });
-    get().bump(false);
+    get().bump(wasFloating);
   },
 }));
 
