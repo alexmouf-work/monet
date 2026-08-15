@@ -1,7 +1,11 @@
 /** Recolour tab — docs/09 §3.5, both modes per docs/05. */
 import { useEffect, useState } from 'react';
 import { hexToRgb, isValidHex, parseHexA } from '../../core/color/convert';
-import { applyReplace, tolerancePctToThreshold } from '../../core/recolor/replace';
+import {
+  applyReplace,
+  tolerancePctToThreshold,
+  type ReplaceBlend,
+} from '../../core/recolor/replace';
 import { applyTint } from '../../core/recolor/tint';
 import { useDocStore } from '../../app/docStore';
 import { useToolStore } from '../../app/toolStore';
@@ -29,6 +33,7 @@ export function RecolourPanel() {
   const [targets, setTargets] = useState<string[]>([activeColor]);
   const [result, setResult] = useState('#FFFFFF');
   const [tolerance, setTolerance] = useState(0);
+  const [blend, setBlend] = useState<ReplaceBlend>('relative');
   const [amount, setAmount] = useState(100);
   const [preview, setPreview] = useState(true);
 
@@ -47,13 +52,14 @@ export function RecolourPanel() {
         targets: valid,
         tolerance: tolerancePctToThreshold(tolerance),
         result: hexToRgb(result),
+        blend,
       };
       updateAdjust((before, after) => applyReplace(before, after, params));
     } else {
       const params = { result: hexToRgb(result), amount: amount / 100 };
       updateAdjust((before, after) => applyTint(before, after, params));
     }
-  }, [doc, mode, targets, result, tolerance, amount, rev]);
+  }, [doc, mode, targets, result, tolerance, blend, amount, rev]);
 
   useEffect(() => setPreviewEnabled(preview), [preview]);
 
@@ -126,6 +132,31 @@ export function RecolourPanel() {
             value={tolerance}
             onChange={setTolerance}
           />
+
+          <span className="field-label">Similar colours</span>
+          <div className="segmented">
+            <button
+              className={blend === 'relative' ? 'is-active' : ''}
+              title="A dark green and a very dark green become a dark purple and a very dark purple"
+              onClick={() => setBlend('relative')}
+            >
+              Keep their differences
+            </button>
+            <button
+              className={blend === 'flat' ? 'is-active' : ''}
+              title="Every matched pixel becomes exactly the result colour"
+              onClick={() => setBlend('flat')}
+            >
+              Flatten to one
+            </button>
+          </div>
+          <p className="panel__hint">
+            {tolerance === 0
+              ? 'At 0 % tolerance only the exact target colour is matched, so this makes no difference.'
+              : blend === 'relative'
+                ? 'Each matched pixel keeps its distance from the target, so shading survives the swap.'
+                : 'Every matched pixel becomes the result colour exactly, flattening any shading.'}
+          </p>
         </>
       ) : (
         <p className="panel__hint">

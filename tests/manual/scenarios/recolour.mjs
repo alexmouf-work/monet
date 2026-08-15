@@ -89,4 +89,54 @@ export default async function ({ ui, shot, state, log, page }) {
   const p = await state.pixelAt(32, 50);
   log('pixel in the (formerly brown) band after tint:', JSON.stringify(p));
   await shot('7-tint-baked');
+
+  // ---- shading survives a swap (owner request 2026-08-11) ----------------------------
+  // Two shades of the same green. Aim the tolerance at the lighter one and swap it for a
+  // dark purple: the darker shade must become a DARKER purple, not the same purple.
+  await ui.newDoc(64);
+  await ui.tab('Brushes');
+  await ui.tool('Pixel pen');
+  await ui.setNumber('Size', 12);
+  await ui.brushColor('#1F5C1F'); // dark green
+  await ui.drag(await ui.atDoc(4, 16), await ui.atDoc(60, 16));
+  await ui.brushColor('#0F2E0F'); // very dark green
+  await ui.drag(await ui.atDoc(4, 44), await ui.atDoc(60, 44));
+  const greens = [await state.countColor('#1F5C1F'), await state.countColor('#0F2E0F')];
+  log('two shades of green:', JSON.stringify(greens));
+  await shot('8-two-greens');
+
+  await ui.tab('Recolour');
+  await page.waitForTimeout(300);
+  await page.locator('.chiprow__hex').first().fill('#1F5C1F');
+  await ui.setColorField('#5C1F5C'); // dark purple
+  await ui.setNumber('Tolerance', 20);
+  await page.waitForTimeout(500);
+
+  const onTarget = await state.countColor('#5C1F5C', 2);
+  const darker = await state.countColor('#2E0F2E', 6);
+  const stillGreen = (await state.countColor('#1F5C1F')) + (await state.countColor('#0F2E0F'));
+  log('dark purple:', onTarget, '· very dark purple:', darker, '· green left:', stillGreen);
+  log(
+    onTarget >= greens[0] * 0.9 && darker >= greens[1] * 0.9 && stillGreen === 0
+      ? '✓ the dark green became dark purple and the very dark green became VERY dark purple'
+      : '✗ the shades did not carry across',
+  );
+  await shot('9-relative');
+
+  // The old behaviour is still one click away.
+  await page.locator('.panel .segmented button:has-text("Flatten to one")').click();
+  await page.waitForTimeout(500);
+  const flattened = await state.countColor('#5C1F5C', 2);
+  log('flatten → pixels on the result colour:', flattened, 'of', greens[0] + greens[1]);
+  log(
+    flattened >= (greens[0] + greens[1]) * 0.9
+      ? '✓ Flatten to one still snaps every matched pixel onto the result'
+      : '✗ flatten did not flatten',
+  );
+  await page.locator('.panel .segmented button:has-text("Keep their differences")').click();
+  await page.waitForTimeout(400);
+  await page.click('.panel .btn--primary');
+  await page.waitForTimeout(400);
+  log('after bake — dark purple:', await state.countColor('#5C1F5C', 2));
+  await shot('10-shading-baked');
 }

@@ -13,6 +13,7 @@ previewed adjustments with the same snapshot/preview/bake lifecycle as noise
 | ------- | --------- |
 | **Target colours** | vertical chip list; each chip = swatch + hex field + eyedropper button + ✕ remove. **`+` button appends a chip** (no limit). Starts with one chip pre-filled with the active colour. |
 | **Tolerance** | 0–100 % slider, default **0** (exact match), same metric as the bucket (A8) |
+| **Similar colours** | segmented: **Keep their differences** (default) / **Flatten to one** — §3.1. A hint line below says which is in force, and that at 0 % tolerance it makes no difference. |
 | **Result colour** | one swatch + hex field + eyedropper |
 | **Preview** | toggle switch, default **on** |
 | **Recolour** | bakes (disabled while no valid target) |
@@ -97,6 +98,44 @@ export function applyReplace(before: Uint8ClampedArray, after: Uint8ClampedArray
 - Fully transparent pixels are never rewritten (their hidden RGB stays).
 - Tolerance is per-channel max over RGB, `T = round(pct/100 * 255)` — identical
   feel to the bucket.
+
+### 3.1 What happens to the *other* matched colours (owner request 2026-08-11)
+
+The snippet above — every matched pixel becomes `result` — is mode **`flat`**. It is no longer
+the default, because with any tolerance at all it destroys shading: a sprite's dark green and
+very dark green both land on one flat purple.
+
+**`relative` (default)**: each matched pixel is recoloured *relative to the target it matched*,
+so the target lands exactly on the result and everything else keeps its distance from it. A
+dark green → dark purple takes the very dark green → very dark purple.
+
+Per matched pixel, in HSL, against the target it matched:
+
+| channel | transform | why |
+| ------- | --------- | --- |
+| hue | `h + (h_result − h_target)` | relative hue differences inside the matched set survive |
+| saturation | `matchMap(s_target, s_result, 'shift')` | see below |
+| lightness | `matchMap(l_target, l_result, 'shift')` | see below |
+
+- **`shift`, not `scale`** (contrast with §7, where `scale` is the default). Matched pixels are
+  by definition *near* the target, so their differences from it are small, and shift is the
+  mapping that carries a small difference across unchanged. A ratio would multiply it by
+  `result/target`, which for a near-black target is enormous — a 2-step difference could become
+  a 50-step one. `matchMap` is imported from `core/relight` rather than reimplemented: one
+  definition of "shift", already unit-tested.
+- **The target lands on the result exactly**, short-circuited before the HSL round trip, which
+  otherwise costs ±1 per channel. It is the anchor everything else is measured from.
+- **Achromatic guards.** A grey *target* has no hue to rotate away from, so the result's hue is
+  used outright. A grey *pixel* likewise: if it gains saturation here, it gains the result's
+  hue, not an arbitrary rotation of an undefined one.
+- **At tolerance 0 the two modes are identical** — only the exact target matches, and that is
+  the anchor. So this changes nothing for exact-match work, and the panel says so.
+- Tolerance still bounds everything: a colour outside it is untouched under either blend.
+
+Properties (asserted in `tests/recolor.test.ts`): the owner's two-greens example lands on a dark
+purple and a *darker* purple whose lightness gap equals the greens'; a five-shade ramp comes out
+as five distinct shades in the same order; each pixel follows the target *it* matched when there
+are several; `flat` still flattens.
 
 ## 4. Mode B — Tint — `core/recolor/tint.ts`
 

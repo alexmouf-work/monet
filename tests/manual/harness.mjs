@@ -160,6 +160,13 @@ const ui = {
     await page.locator('.colorpanel .swatches').first().locator('.swatch').nth(index).click();
     await page.waitForTimeout(80);
   },
+  /** Set the active paint colour to an arbitrary hex, via the colour panel's own field. */
+  async brushColor(hex) {
+    const field = page.locator('.colorpanel__hex');
+    await field.fill(hex);
+    await field.press('Enter');
+    await page.waitForTimeout(120);
+  },
   /**
    * Set a ColorField's hex input (a text field, so React sees the change — assigning to an
    * <input type=color>.value programmatically does not fire React's onChange).

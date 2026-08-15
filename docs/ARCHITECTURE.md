@@ -41,7 +41,9 @@ src/core/                              PURE: no DOM, no React, all unit-tested
   color/{convert,palette}.ts           HSL/HSV/hex, MS-Paint 20
   shapes/{geometry,spline,transformOps}.ts  contours, Catmull-Rom, handle scaling
   noise/{fields,apply}.ts              13 fields from one hash, brightness/hue apply
-  recolor/{replace,tint}.ts
+  recolor/{replace,tint}.ts            replace recolours matched pixels RELATIVE to the
+                                       target they matched (shading survives a swap);
+                                       `flat` snaps them all onto the result
   relight/relight.ts                   brightness-only maps (hue never moves): match + adjust
   io/{monetFile,ico,bmp,pdfFit,pdfExport}.ts
 
@@ -150,6 +152,8 @@ preview matrices, paused editing, slot edit → saved JSON) · `model3d-multi` (
 box-select, on-canvas outline count, one-step multi-move, filters) · `pixel-alignment` (clicks
 at pixel corners land on that pixel — the helpers aim at centres, where the bug hid) ·
 `relight` (the owner's match scenario end to end, mapping differences, hue invariance) ·
+`recolour` (replace with several targets, tolerance, tint amount, preview/bake — and the owner's
+two-shades-of-green swap coming out as two shades of purple) ·
 `model-bundle` (open a model from local files, placeholder a missing texture, paint it, get it
 all back in a zip, and write-back: off by default, then on from the sidebar, asserted by decoding
 the PNG a fake directory handle received) · `live-edit` (the four 2026-08-11 owner reports, every
