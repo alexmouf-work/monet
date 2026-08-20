@@ -41,6 +41,8 @@ export interface MonetDebug {
   layerBounds(): { x: number; y: number; w: number; h: number } | null;
   /** The floating selection's own pixels, so a scenario can see a flip in the data. */
   floatPixels(): { w: number; h: number; pixels: number[] } | null;
+  /** How many pixels of a colour there are in the composite, and which alphas they carry. */
+  alphaHistogram(hex: string, tolerance?: number): { count: number; alphas: number[] };
   pixelAt(x: number, y: number): [number, number, number, number] | null;
   /** Renderer frame costs since the last `resetPerf()` — the perf scenario's measuring stick. */
   perf(): { frames: number; totalMs: number; avgMs: number; maxMs: number; composites: number };
@@ -111,6 +113,10 @@ export function installDebugBridge(): void {
         tab: ts.tab,
         color: ts.color,
         alpha: ts.alpha,
+        brushSize:
+          ts.active === 'pen' || ts.active === 'marker' || ts.active === 'eraser'
+            ? ts[ts.active].size
+            : null,
         view: ds.activeId ? vs.get(ds.activeId) : null,
         grid: vs.grid,
         tiling: vs.tiling,
@@ -164,6 +170,29 @@ export function installDebugBridge(): void {
     floatPixels() {
       const f = useDocStore.getState().selection?.floating;
       return f ? { w: f.w, h: f.h, pixels: Array.from(f.pixels) } : null;
+    },
+    alphaHistogram(hex, tolerance = 8) {
+      const d = useDocStore.getState().active();
+      if (!d) return { count: 0, alphas: [] };
+      const px = compositePixels(d, { ...getComposeOpts(), includeBackground: false });
+      const n = parseInt(hex.replace('#', ''), 16);
+      const r = (n >> 16) & 255;
+      const g = (n >> 8) & 255;
+      const b = n & 255;
+      const alphas = new Set<number>();
+      let count = 0;
+      for (let i = 0; i < px.length; i += 4) {
+        if (px[i + 3] === 0) continue;
+        if (
+          Math.abs(px[i] - r) <= tolerance &&
+          Math.abs(px[i + 1] - g) <= tolerance &&
+          Math.abs(px[i + 2] - b) <= tolerance
+        ) {
+          count++;
+          alphas.add(px[i + 3]);
+        }
+      }
+      return { count, alphas: [...alphas].sort((x, y) => x - y) };
     },
     brushOutline: () => brushOutlineRect(),
     stampOrigin: (p, size) => tipOrigin(p, size),

@@ -1,5 +1,5 @@
 /**
- * Relight — docs/05 §7. Recolour's cousin: it never touches hue, only how bright a pixel is.
+ * Relight — docs/05 §8. Recolour's cousin: it never touches hue, only how bright a pixel is.
  *
  * "Brightness" is genuinely ambiguous, so the measure is a choice:
  * - `lightness` (default) is HSL's L. Hue AND saturation survive exactly, and every target is

@@ -1,5 +1,5 @@
 /**
- * Relight — docs/05 §7. The owner's scenario, end to end: pick a pale blue in the image, match
+ * Relight — docs/05 §8. The owner's scenario, end to end: pick a pale blue in the image, match
  * it to a dark green's brightness, and watch it become a DARK BLUE while the rest of the sprite
  * follows the same curve. Then the manual Adjust mode, the "only this colour" limit, and a bake.
  */

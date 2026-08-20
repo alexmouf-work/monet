@@ -69,7 +69,7 @@ panel with preview/bake lifecycle.
 
 ## M9 — Recolour
 Replace (chips, tolerance, preview) + Tint (amount) + shared lifecycle.
-**Accept:** [05 §6] in full.
+**Accept:** [05 §7] in full.
 
 ## M10 — Export formats
 JPEG (quality, matte), WebP (feature-detected), ICO writer, BMP writer, PDF

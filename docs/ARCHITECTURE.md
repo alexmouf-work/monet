@@ -43,9 +43,10 @@ src/core/                              PURE: no DOM, no React, all unit-tested
   color/{convert,palette}.ts           HSL/HSV/hex, MS-Paint 20
   shapes/{geometry,spline,transformOps}.ts  contours, Catmull-Rom, handle scaling
   noise/{fields,apply}.ts              13 fields from one hash, brightness/hue apply
-  recolor/{replace,tint}.ts            replace recolours matched pixels RELATIVE to the
+  recolor/{replace,tint,opacity}.ts    replace recolours matched pixels RELATIVE to the
                                        target they matched (shading survives a swap);
-                                       `flat` snaps them all onto the result
+                                       `flat` snaps them all onto the result; opacity
+                                       multiplies one colour's ALPHA by 0–255, RGB untouched
   relight/relight.ts                   brightness-only maps (hue never moves): match + adjust
   io/{monetFile,ico,bmp,pdfFit,pdfExport}.ts
 
@@ -158,7 +159,10 @@ at pixel corners land on that pixel — the helpers aim at centres, where the bu
 two-shades-of-green swap coming out as two shades of purple) ·
 `model-bundle` (open a model from local files, placeholder a missing texture, paint it, get it
 all back in a zip, and write-back: off by default, then on from the sidebar, asserted by decoding
-the PNG a fake directory handle received) · `selection-transform` (wheel rotates a live selection, F/Shift+F mirror it, a 90° round trip
+the PNG a fake directory handle received) · `numfields-opacity` (a field can be emptied while typing and resolves to 1/255 on blur; the
+alpha box is typeable on the 0–255 scale; Recolour's Opacity mode halves one colour's alpha,
+leaves the other alone, and consumes its multiplier on bake) ·
+`selection-transform` (wheel rotates a live selection, F/Shift+F mirror it, a 90° round trip
 returns the original pixels, and the wheel is the zoom again once nothing is selected) ·
 `live-edit` (the four 2026-08-11 owner reports, every
 check read off the VISIBLE canvas rather than the document: outline == painted bounds, stroke and
@@ -248,7 +252,7 @@ Three things that bite here:
 - **`integrations/sources.ts`** is a provider façade so `fileActions` never branches on
   jar/folder/repo.
 - **`app/adjustSession.ts`** is shared preview/bake infrastructure the spec described twice
-  (docs/04 §6 and docs/05 §5).
+  (docs/04 §6 and docs/05 §6).
 - **Fonts** are `@fontsource` packages (Silkscreen default), not Monocraft — docs/03 §6.2.
 - **Checkerboard** lightened to `#ffffff`/`#d4d4d4` — docs/01 §4 step 3.
 - **Brushes keep a visible `crosshair` cursor** instead of `cursor: none` — docs/09 §8, owner
@@ -301,6 +305,12 @@ submission, not GPU rasterisation.
   per colour per object per frame, so allocation there is per-frame allocation.
 
 ## Invariants worth knowing before editing
+
+- **Every numeric field is `ui/controls/NumBox.tsx`.** A controlled `<input type="number">`
+  with `+e.target.value` cannot be emptied — `+'' === 0` commits and the digit reappears
+  (owner report 2026-08-11). NumBox holds local text, commits only what parses, and resolves an
+  empty box to `emptyValue` on blur (brush size 1, opacity 255). Do not hand-roll another one;
+  `Slider` is a range input plus a NumBox.
 
 - **Zustand selectors must not allocate.** A fresh object or array per call breaks referential
   equality and re-renders forever (React error #185). Read stored values and apply defaults

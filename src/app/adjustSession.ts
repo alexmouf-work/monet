@@ -1,6 +1,6 @@
 /**
  * Shared preview/bake lifecycle for the previewed adjustments — noise (docs/04 §6) and
- * recolour (docs/05 §5). Snapshot the raster layers on open, recompute previews on every
+ * recolour (docs/05 §6). Snapshot the raster layers on open, recompute previews on every
  * parameter change, bake into one undoable command, then re-snapshot so bakes stack.
  */
 import type { MonetDoc, RasterLayer } from '../core/model/types';

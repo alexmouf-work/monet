@@ -1,6 +1,7 @@
 /** New document — docs/09 §6. Remembers the last used size/background (A7). */
 import { useState } from 'react';
 import { Dialog } from './Dialog';
+import { NumBox } from '../controls/NumBox';
 import { MAX_DIM, type Background } from '../../core/model/types';
 import { useDocStore } from '../../app/docStore';
 import { useSettingsStore } from '../../app/settingsStore';
@@ -44,23 +45,11 @@ export function NewDocDialog({ onClose }: { onClose(): void }) {
       <div className="field-row">
         <label>
           Width
-          <input
-            type="number"
-            min={1}
-            max={MAX_DIM}
-            value={w}
-            onChange={(e) => setWidth(+e.target.value)}
-          />
+          <NumBox min={1} max={MAX_DIM} value={w} onCommit={setWidth} />
         </label>
         <label>
           Height
-          <input
-            type="number"
-            min={1}
-            max={MAX_DIM}
-            value={h}
-            onChange={(e) => setHeight(+e.target.value)}
-          />
+          <NumBox min={1} max={MAX_DIM} value={h} onCommit={setHeight} />
         </label>
         <button
           className={`iconbtn ${linked ? 'is-active' : ''}`}

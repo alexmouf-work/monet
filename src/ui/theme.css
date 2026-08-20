@@ -479,6 +479,7 @@ textarea {
 }
 
 .slider__num,
+.numbox,
 input[type='number'] {
   width: 62px;
   padding: 3px 5px;
@@ -1156,9 +1157,14 @@ kbd {
   min-width: 0;
 }
 
-.colorpanel__alpha output {
+.colorpanel__alphanum {
+  flex: 0 0 auto;
+  width: 46px;
+  padding: 2px 4px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel-2);
   font-variant-numeric: tabular-nums;
-  min-width: 34px;
   text-align: right;
 }
 

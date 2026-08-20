@@ -6,6 +6,7 @@ import { normalizeAngle } from '../../core/shapes/geometry';
 import { selectedObject, useDocStore } from '../../app/docStore';
 import { useToolStore } from '../../app/toolStore';
 import { Slider } from '../controls/Slider';
+import { NumBox } from '../controls/NumBox';
 import { ColorField } from '../controls/ColorField';
 
 const TYPES: { id: ShapeType; icon: string; name: string }[] = [
@@ -181,42 +182,34 @@ export function ShapesPanel() {
           <div className="field-row">
             <label>
               X
-              <input
-                type="number"
+              <NumBox
                 value={Math.round(obj.transform.cx)}
-                onChange={(e) => patchObject((o) => (o.transform.cx = +e.target.value), 'Move')}
+                onCommit={(v) => patchObject((o) => (o.transform.cx = v), 'Move')}
               />
             </label>
             <label>
               Y
-              <input
-                type="number"
+              <NumBox
                 value={Math.round(obj.transform.cy)}
-                onChange={(e) => patchObject((o) => (o.transform.cy = +e.target.value), 'Move')}
+                onCommit={(v) => patchObject((o) => (o.transform.cy = v), 'Move')}
               />
             </label>
           </div>
           <div className="field-row">
             <label>
               W
-              <input
-                type="number"
+              <NumBox
                 min={1}
                 value={Math.round(obj.transform.w)}
-                onChange={(e) =>
-                  patchObject((o) => (o.transform.w = Math.max(1, +e.target.value)), 'Resize')
-                }
+                onCommit={(v) => patchObject((o) => (o.transform.w = v), 'Resize')}
               />
             </label>
             <label>
               H
-              <input
-                type="number"
+              <NumBox
                 min={1}
                 value={Math.round(obj.transform.h)}
-                onChange={(e) =>
-                  patchObject((o) => (o.transform.h = Math.max(1, +e.target.value)), 'Resize')
-                }
+                onCommit={(v) => patchObject((o) => (o.transform.h = v), 'Resize')}
               />
             </label>
           </div>

@@ -1,9 +1,11 @@
 # 05 — Recolour and Relight
 
-Two modes in one feature tab, switched by a segmented control: **Replace** (swap
-specific colours) and **Tint** (uniform recolour respecting brightness). Both are
-previewed adjustments with the same snapshot/preview/bake lifecycle as noise
-([04 §6]); both act on **raster layers only** (A2), whole canvas, alpha preserved.
+Three modes in one feature tab, switched by a segmented control: **Replace** (swap
+specific colours), **Opacity** (fade specific colours — §5, owner request 2026-08-11) and
+**Tint** (uniform recolour respecting brightness). All are previewed adjustments with the same
+snapshot/preview/bake lifecycle as noise ([04 §6]); all act on **raster layers only** (A2),
+whole canvas. Replace and Tint preserve alpha exactly; Opacity is the one that moves it, and
+in exchange never touches RGB.
 
 ## 1. Panel spec (placement in [09 §3.5])
 
@@ -17,6 +19,14 @@ previewed adjustments with the same snapshot/preview/bake lifecycle as noise
 | **Result colour** | one swatch + hex field + eyedropper |
 | **Preview** | toggle switch, default **on** |
 | **Recolour** | bakes (disabled while no valid target) |
+
+**Mode: Opacity** — target chips and tolerance exactly as Replace, plus:
+
+| Control | Behaviour |
+| ------- | --------- |
+| **Opacity ×** | 0–255 slider + typeable box, default **255**; empty resolves to 255 [09 §11.1] |
+| **Preview** | toggle, default on |
+| **Recolour** | bakes, and **resets the multiplier to 255** — see §5 |
 
 **Mode: Tint**
 
@@ -117,7 +127,7 @@ Per matched pixel, in HSL, against the target it matched:
 | saturation | `matchMap(s_target, s_result, 'shift')` | see below |
 | lightness | `matchMap(l_target, l_result, 'shift')` | see below |
 
-- **`shift`, not `scale`** (contrast with §7, where `scale` is the default). Matched pixels are
+- **`shift`, not `scale`** (contrast with §8, where `scale` is the default). Matched pixels are
   by definition *near* the target, so their differences from it are small, and shift is the
   mapping that carries a small difference across unchanged. A ratio would multiply it by
   `result/target`, which for a near-black target is enormous — a 2-step difference could become
@@ -170,7 +180,36 @@ Properties (assert in tests):
 - tinting with pure grey (`s = 0`) desaturates while preserving lightness;
 - alpha untouched everywhere.
 
-## 5. Preview & bake
+## 5. Mode C — Opacity — `core/recolor/opacity.ts` (owner request 2026-08-11)
+
+Multiply the alpha of one colour — and anything inside the tolerance of it — by a given
+amount, leaving every other pixel and every RGB value alone.
+
+```ts
+export interface OpacityParams { targets: Rgb[]; tolerance: number; amount: number /*0–255*/ }
+// alpha' = round(alpha * clamp(amount, 0, 255) / 255)   for matched, opaque-ish pixels
+```
+
+- **The amount is on alpha's own 0–255 scale**, not a percentage: 255 multiplies by 1 and
+  changes nothing, 128 halves, 0 makes the colour invisible. So the identity is also the
+  default, and there is one number in play rather than a percentage to convert mentally.
+- Matching is **Replace's, unchanged** (§3): per-channel Chebyshev over RGB, alpha ignored when
+  deciding, fully transparent pixels never rewritten. A colour outside the tolerance is
+  untouched at any amount.
+- **RGB is never modified** — this mode moves alpha and nothing else, which is what makes it
+  composable with a Replace pass.
+- **The bake consumes the multiplier** (reset to 255). `adjustSession` re-snapshots so that
+  bakes stack, and a multiply is the one mode that is *not* idempotent: leaving 128 in the box
+  would halve the already-halved pixels the moment the panel re-ran. Replace and Tint need no
+  such reset — a second Replace pass finds none of the old colour left, and a second Tint pass
+  finds the hue and saturation it would set already set.
+
+Properties (asserted in `tests/recolor.test.ts`): 255 is the identity; 128 halves both a fully
+opaque and an already-faint pixel; 0 empties exactly the target colour and nothing else; the
+tolerance bounds it; several targets work; no targets is the identity; and an out-of-range
+amount clamps rather than inverting.
+
+## 6. Preview & bake
 
 Identical lifecycle to noise [04 §6]: snapshot raster layers at tab-open; recompute
 previews on any param change (throttled to rAF); **Preview off** shows the
@@ -182,7 +221,7 @@ first" hint appears when the stack contains shapes/text.
 Both modes recompute in one pass over ≤ 4096² pixels; Replace's inner target loop
 is over a handful of chips — no optimisation needed.
 
-## 6. Acceptance
+## 7. Acceptance
 
 - Replace with targets {grass greens ×3} → result brown on a 16² grass texture
   changes exactly the matching pixels; a 1-off-colour pixel is untouched at
@@ -198,7 +237,7 @@ is over a handful of chips — no optimisation needed.
 
 ---
 
-## 7. Relight — `core/relight/relight.ts` (owner request 2026-08-11)
+## 8. Relight — `core/relight/relight.ts` (owner request 2026-08-11)
 
 Recolour's cousin. It **never touches hue**: it changes only how bright a pixel is, and
 carries the whole image along one curve so shading stays coherent.

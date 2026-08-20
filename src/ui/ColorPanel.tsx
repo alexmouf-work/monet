@@ -1,6 +1,7 @@
 /** Colour panel — docs/09 §5: swatch, hex+alpha, HSV picker, palette, customs, recents. */
 import { useEffect, useRef, useState } from 'react';
 import { hexToRgb, hsvToRgb, parseHexA, rgbToHex, rgbToHsv } from '../core/color/convert';
+import { NumBox } from './controls/NumBox';
 import { PAINT_PALETTE } from '../core/color/palette';
 import { useToolStore } from '../app/toolStore';
 
@@ -133,16 +134,27 @@ export function ColorPanel() {
               if (e.key === 'Enter') commitHex();
             }}
           />
+          {/* 0–255, not 0–100 %: alpha is a byte everywhere else in a texture pipeline, and
+              the owner asked for a typeable opacity that falls back to 255 (docs/09 §5). */}
           <label className="colorpanel__alpha">
             <span>Alpha</span>
             <input
               type="range"
               min={0}
-              max={100}
-              value={Math.round(alpha * 100)}
-              onChange={(e) => setAlpha(+e.target.value / 100)}
+              max={255}
+              value={Math.round(alpha * 255)}
+              aria-label="Alpha"
+              onChange={(e) => setAlpha(+e.target.value / 255)}
             />
-            <output>{Math.round(alpha * 100)}%</output>
+            <NumBox
+              className="colorpanel__alphanum"
+              value={Math.round(alpha * 255)}
+              min={0}
+              max={255}
+              emptyValue={255}
+              ariaLabel="Alpha"
+              onCommit={(v) => setAlpha(v / 255)}
+            />
           </label>
         </div>
       </div>

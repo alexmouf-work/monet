@@ -45,6 +45,7 @@ monet/
       noise/apply.ts          brightness/hue application [04 §5]
       recolor/replace.ts      mode A [05 §3]
       recolor/tint.ts         mode B [05 §4]
+      recolor/opacity.ts      mode C [05 §5]
       io/monetFile.ts         .monet read/write [07 §8]
       io/ico.ts  io/bmp.ts    byte-level encoders [07 §5, §6]
       io/pdfExport.ts         [07 §7]
@@ -229,7 +230,7 @@ the canvas backing store to `cssSize × devicePixelRatio`:
      `raster/crisp.ts`: draw to a doc-sized offscreen, threshold alpha at 128,
      cache by `(id, contentVersion)`, then `drawImage`.
    - When a **noise/recolour preview** is live, raster layers are drawn from the
-     preview buffers instead ([04 §6], [05 §5]).
+     preview buffers instead ([04 §6], [05 §6]).
 6. **Floating selection** pixels, if any [06 §4].
 7. Reset transform; draw **overlays** in screen space: pixel grid (zoom ≥ 8), marquee
    ants, object handles, brush tip outline at the cursor, text caret box.

@@ -21,6 +21,7 @@ import {
   updateAdjust,
 } from '../../app/adjustSession';
 import { Slider } from '../controls/Slider';
+import { NumBox } from '../controls/NumBox';
 
 export function NoisePanel() {
   const doc = useDocStore((s) => (s.activeId ? s.docs[s.activeId] : null));
@@ -126,10 +127,10 @@ export function NoisePanel() {
       <div className="field-row">
         <label>
           Seed
-          <input
-            type="number"
+          <NumBox
+            min={0}
             value={params.seed}
-            onChange={(e) => patch({ seed: Math.abs(Math.round(+e.target.value)) || 0 })}
+            onCommit={(v) => patch({ seed: Math.abs(Math.round(v)) || 0 })}
           />
         </label>
         <button

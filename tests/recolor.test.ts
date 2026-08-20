@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { applyReplace, tolerancePctToThreshold } from '../src/core/recolor/replace';
+import { applyOpacity } from '../src/core/recolor/opacity';
 import { applyTint } from '../src/core/recolor/tint';
 import { hexToRgb, rgbToHsl } from '../src/core/color/convert';
 import { emptyPixels } from '../src/core/raster/pixels';
@@ -304,5 +305,94 @@ describe('applyTint', () => {
     const after = emptyPixels(1, 1);
     applyTint(before, after, { result: { r: 255, g: 0, b: 0 }, amount: 1 });
     expect(px4(after, 0)).toEqual([10, 20, 30, 0]);
+  });
+});
+
+describe('applyOpacity (owner request 2026-08-11)', () => {
+  const RED = { r: 255, g: 0, b: 0 };
+
+  it('255 is the identity — the default changes nothing', () => {
+    const before = buf([[255, 0, 0, 200]]);
+    const after = emptyPixels(1, 1);
+    applyOpacity(before, after, { targets: [RED], tolerance: 0, amount: 255 });
+    expect(px4(after, 0)).toEqual([255, 0, 0, 200]);
+  });
+
+  it('multiplies the matched colour’s alpha and leaves its RGB alone', () => {
+    const before = buf([
+      [255, 0, 0, 200],
+      [255, 0, 0, 100],
+    ]);
+    const after = emptyPixels(2, 1);
+    applyOpacity(before, after, { targets: [RED], tolerance: 0, amount: 128 });
+    // 200 × 128/255 = 100.4 → 100;  100 × 128/255 = 50.2 → 50.
+    expect(px4(after, 0)).toEqual([255, 0, 0, 100]);
+    expect(px4(after, 1)).toEqual([255, 0, 0, 50]);
+  });
+
+  it('0 makes exactly that colour invisible, and nothing else', () => {
+    const before = buf([
+      [255, 0, 0, 255],
+      [0, 0, 255, 255],
+    ]);
+    const after = emptyPixels(2, 1);
+    applyOpacity(before, after, { targets: [RED], tolerance: 0, amount: 0 });
+    expect(px4(after, 0)).toEqual([255, 0, 0, 0]);
+    expect(px4(after, 1)).toEqual([0, 0, 255, 255]);
+  });
+
+  it('takes everything inside the tolerance and nothing outside it', () => {
+    const before = buf([
+      [255, 0, 0, 255], // the target
+      [245, 10, 10, 255], // within 10
+      [200, 0, 0, 255], // 55 away
+    ]);
+    const after = emptyPixels(3, 1);
+    applyOpacity(before, after, { targets: [RED], tolerance: 10, amount: 0 });
+    expect(px4(after, 0)[3]).toBe(0);
+    expect(px4(after, 1)[3]).toBe(0);
+    expect(px4(after, 2)[3]).toBe(255);
+  });
+
+  it('matches on RGB regardless of alpha, and never rewrites a transparent pixel', () => {
+    const before = buf([
+      [255, 0, 0, 40], // already faint: still a match, still scaled
+      [255, 0, 0, 0], // fully transparent: left exactly as it is
+    ]);
+    const after = emptyPixels(2, 1);
+    applyOpacity(before, after, { targets: [RED], tolerance: 0, amount: 128 });
+    expect(px4(after, 0)).toEqual([255, 0, 0, 20]);
+    expect(px4(after, 1)).toEqual([255, 0, 0, 0]);
+  });
+
+  it('handles several targets, and no targets is the identity', () => {
+    const before = buf([
+      [255, 0, 0, 255],
+      [0, 0, 255, 255],
+      [0, 255, 0, 255],
+    ]);
+    const after = emptyPixels(3, 1);
+    applyOpacity(before, after, {
+      targets: [RED, { r: 0, g: 0, b: 255 }],
+      tolerance: 0,
+      amount: 51, // ×0.2
+    });
+    expect(px4(after, 0)[3]).toBe(51);
+    expect(px4(after, 1)[3]).toBe(51);
+    expect(px4(after, 2)[3]).toBe(255);
+
+    const none = emptyPixels(3, 1);
+    applyOpacity(before, none, { targets: [], tolerance: 255, amount: 0 });
+    expect([...none]).toEqual([...before]);
+  });
+
+  it('clamps an out-of-range amount rather than inverting or overflowing', () => {
+    const before = buf([[255, 0, 0, 200]]);
+    const hi = emptyPixels(1, 1);
+    const lo = emptyPixels(1, 1);
+    applyOpacity(before, hi, { targets: [RED], tolerance: 0, amount: 999 });
+    applyOpacity(before, lo, { targets: [RED], tolerance: 0, amount: -5 });
+    expect(px4(hi, 0)[3]).toBe(200);
+    expect(px4(lo, 0)[3]).toBe(0);
   });
 });

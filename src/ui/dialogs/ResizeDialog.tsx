@@ -1,6 +1,7 @@
 /** Resize canvas — docs/06 §1.2. px/% units, aspect lock, and resize-image-with-canvas. */
 import { useState } from 'react';
 import { Dialog } from './Dialog';
+import { NumBox } from '../controls/NumBox';
 import { MAX_DIM } from '../../core/model/types';
 import type { Resample } from '../../core/raster/transform';
 import { clampDim, pctToPx, resizeCanvas } from '../../app/canvasActions';
@@ -75,23 +76,11 @@ export function ResizeDialog({ onClose }: { onClose(): void }) {
       <div className="field-row">
         <label>
           Width
-          <input
-            type="number"
-            min={1}
-            max={unit === 'px' ? MAX_DIM : 1000}
-            value={w}
-            onChange={(e) => setWidth(+e.target.value)}
-          />
+          <NumBox min={1} max={unit === 'px' ? MAX_DIM : 1000} value={w} onCommit={setWidth} />
         </label>
         <label>
           Height
-          <input
-            type="number"
-            min={1}
-            max={unit === 'px' ? MAX_DIM : 1000}
-            value={h}
-            onChange={(e) => setHeight(+e.target.value)}
-          />
+          <NumBox min={1} max={unit === 'px' ? MAX_DIM : 1000} value={h} onCommit={setHeight} />
         </label>
       </div>
 

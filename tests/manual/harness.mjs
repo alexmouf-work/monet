@@ -179,7 +179,7 @@ const ui = {
   },
   /** Set a numeric field inside the options panel by its slider label. */
   async setNumber(label, value) {
-    const input = page.locator(`.panel .slider:has-text("${label}") input[type="number"]`);
+    const input = page.locator(`.panel .slider:has-text("${label}") .slider__num`);
     await input.fill(String(value));
     await input.blur();
     await page.waitForTimeout(120);

@@ -1,4 +1,4 @@
-/** Relight tab — docs/05 §7. Recolour's cousin: hue never moves, only brightness. */
+/** Relight tab — docs/05 §8. Recolour's cousin: hue never moves, only brightness. */
 import { useEffect, useState } from 'react';
 import { hexToRgb, isValidHex, rgbToHex } from '../../core/color/convert';
 import { tolerancePctToThreshold } from '../../core/recolor/replace';
