@@ -223,7 +223,15 @@ export function RecolourPanel() {
       )}
 
       {mode === 'tint' && (
-        <Slider label="Amount" suffix="%" min={0} max={100} value={amount} onChange={setAmount} />
+        <Slider
+          label="Amount"
+          suffix="%"
+          min={-100}
+          max={100}
+          emptyValue={100}
+          value={amount}
+          onChange={setAmount}
+        />
       )}
 
       <label className="check">

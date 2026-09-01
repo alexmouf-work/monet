@@ -8,8 +8,14 @@ export interface NoiseParams {
   /** Feature scale multiplier; 2 = features twice as large. */
   z: number;
   seed: number;
-  /** 0–100. */
+  /**
+   * −100…100. Negative inverts the field — dark where it would have been light — which is the
+   * same pattern read the other way round, not a different one (owner request 2026-08-11).
+   */
   intensity: number;
+  /** Where the field is sampled from, in doc pixels. Dragging the canvas moves this. */
+  offsetX: number;
+  offsetY: number;
   brightness: boolean;
   hue: boolean;
 }
@@ -19,6 +25,8 @@ export const DEFAULT_NOISE: Omit<NoiseParams, 'seed'> = {
   rotationDeg: 0,
   z: 1,
   intensity: 50,
+  offsetX: 0,
+  offsetY: 0,
   brightness: true,
   hue: false,
 };
@@ -32,8 +40,8 @@ export function buildNoiseMap(W: number, H: number, p: NoiseParams): Float32Arra
   const cell = NOISE_CELL * p.z;
   for (let y = 0; y < H; y++) {
     for (let x = 0; x < W; x++) {
-      const qx = x + 0.5 - W / 2;
-      const qy = y + 0.5 - H / 2;
+      const qx = x + 0.5 - W / 2 + p.offsetX;
+      const qy = y + 0.5 - H / 2 + p.offsetY;
       // Inverse-rotate the lookup so the pattern itself rotates clockwise.
       const u = qx * c + qy * s;
       const v = -qx * s + qy * c;
@@ -54,6 +62,8 @@ export function buildNoiseMap(W: number, H: number, p: NoiseParams): Float32Arra
 /**
  * Apply the map to pixels — docs/04 §5. Brightness moves lightness by up to ±50 % and hue by
  * up to ±180° at full intensity. Alpha is never touched and transparent pixels are skipped.
+ * A negative intensity simply makes `k` negative, which inverts the field's sign — no special
+ * case needed.
  */
 export function applyNoise(
   before: Uint8ClampedArray,

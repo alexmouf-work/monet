@@ -65,7 +65,7 @@ with cross-seam painting.
 ## M8 — Noise
 Fields module (13 types, deterministic), map builder, apply (brightness/hue),
 panel with preview/bake lifecycle.
-**Accept:** [04 §7] in full.
+**Accept:** [04 §8] in full.
 
 ## M9 — Recolour
 Replace (chips, tolerance, preview) + Tint (amount) + shared lifecycle.

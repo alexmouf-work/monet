@@ -396,3 +396,37 @@ describe('applyOpacity (owner request 2026-08-11)', () => {
     expect(px4(lo, 0)[3]).toBe(0);
   });
 });
+
+describe('a negative tint amount extrapolates away from the colour (owner request)', () => {
+  it('−1 moves as far from the tint as +1 moves toward it', () => {
+    const before = buf([[128, 128, 128, 255]]);
+    const pos = emptyPixels(1, 1);
+    const neg = emptyPixels(1, 1);
+    const target = hexToRgb('#3FA7D6');
+    applyTint(before, pos, { result: target, amount: 1 });
+    applyTint(before, neg, { result: target, amount: -1 });
+    for (let c = 0; c < 3; c++) {
+      // before is the midpoint of the two, channel by channel (bar clamping).
+      if (pos[c] > 0 && pos[c] < 255 && neg[c] > 0 && neg[c] < 255) {
+        expect(Math.abs((pos[c] + neg[c]) / 2 - before[c])).toBeLessThanOrEqual(1);
+      }
+    }
+    expect([...neg.slice(0, 3)]).not.toEqual([...pos.slice(0, 3)]);
+  });
+
+  it('amount 0 is still the identity', () => {
+    const before = buf([[10, 200, 30, 255]]);
+    const after = emptyPixels(1, 1);
+    applyTint(before, after, { result: hexToRgb('#3FA7D6'), amount: 0 });
+    expect([...after]).toEqual([...before]);
+  });
+
+  it('clamps below −1 rather than running away', () => {
+    const before = buf([[128, 128, 128, 255]]);
+    const one = emptyPixels(1, 1);
+    const far = emptyPixels(1, 1);
+    applyTint(before, one, { result: hexToRgb('#3FA7D6'), amount: -1 });
+    applyTint(before, far, { result: hexToRgb('#3FA7D6'), amount: -8 });
+    expect([...far]).toEqual([...one]);
+  });
+});

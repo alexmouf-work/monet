@@ -22,6 +22,8 @@ import {
 } from '../../app/adjustSession';
 import { Slider } from '../controls/Slider';
 import { NumBox } from '../controls/NumBox';
+import { noiseOffset, setNoiseOffset, subscribeNoiseOffset } from '../../app/noisePanState';
+import { useToolStore } from '../../app/toolStore';
 
 export function NoisePanel() {
   const doc = useDocStore((s) => (s.activeId ? s.docs[s.activeId] : null));
@@ -31,6 +33,17 @@ export function NoisePanel() {
   const [preview, setPreview] = useState(true);
   const mapRef = useRef<Float32Array | null>(null);
   const mapKeyRef = useRef('');
+  // The offset lives in a leaf module because the canvas drag writes it too (docs/04 §7).
+  const [, forceOffset] = useState(0);
+  useEffect(() => subscribeNoiseOffset(() => forceOffset((n) => n + 1)), []);
+  const offset = noiseOffset();
+
+  // While this tab is open the canvas drags the pattern; leaving hands the tool back.
+  useEffect(() => {
+    const ts = useToolStore.getState();
+    ts.pushTransient('noisePan');
+    return () => useToolStore.getState().popTransient();
+  }, []);
 
   // Open a session for this document and tear it down when the tab or document changes.
   useEffect(() => {
@@ -43,14 +56,15 @@ export function NoisePanel() {
   useEffect(() => {
     if (!doc) return;
     resyncAdjust();
-    const key = `${params.type}|${params.rotationDeg}|${params.z}|${params.seed}|${doc.width}x${doc.height}`;
+    const field = { ...params, offsetX: offset.x, offsetY: offset.y };
+    const key = `${field.type}|${field.rotationDeg}|${field.z}|${field.seed}|${field.offsetX},${field.offsetY}|${doc.width}x${doc.height}`;
     if (key !== mapKeyRef.current || !mapRef.current) {
-      mapRef.current = buildNoiseMap(doc.width, doc.height, params);
+      mapRef.current = buildNoiseMap(doc.width, doc.height, field);
       mapKeyRef.current = key;
     }
     const map = mapRef.current;
-    updateAdjust((before, after) => applyNoise(before, after, map, params));
-  }, [doc, doc?.width, doc?.height, params, rev]);
+    updateAdjust((before, after) => applyNoise(before, after, map, field));
+  }, [doc, doc?.width, doc?.height, params, offset.x, offset.y, rev]);
 
   useEffect(() => setPreviewEnabled(preview), [preview]);
 
@@ -80,8 +94,9 @@ export function NoisePanel() {
       <Slider
         label="Rotation"
         suffix="°"
-        min={0}
+        min={-360}
         max={360}
+        emptyValue={0}
         value={Math.round(params.rotationDeg)}
         onChange={(v) => patch({ rotationDeg: v })}
       />
@@ -97,11 +112,37 @@ export function NoisePanel() {
       <Slider
         label="Intensity"
         suffix="%"
-        min={0}
+        min={-100}
         max={100}
+        emptyValue={0}
         value={params.intensity}
         onChange={(v) => patch({ intensity: v })}
       />
+      {params.intensity < 0 && (
+        <p className="panel__hint">
+          Negative intensity inverts the field — light where it would have been dark.
+        </p>
+      )}
+
+      <span className="field-label">Offset (drag the canvas)</span>
+      <div className="field-row">
+        <label>
+          X
+          <NumBox value={offset.x} emptyValue={0} onCommit={(v) => setNoiseOffset(v, offset.y)} />
+        </label>
+        <label>
+          Y
+          <NumBox value={offset.y} emptyValue={0} onCommit={(v) => setNoiseOffset(offset.x, v)} />
+        </label>
+        <button
+          className="iconbtn"
+          title="Back to the origin"
+          disabled={offset.x === 0 && offset.y === 0}
+          onClick={() => setNoiseOffset(0, 0)}
+        >
+          ⌖
+        </button>
+      </div>
 
       <div className="field-row">
         <span className="field-label">Affect</span>
@@ -162,7 +203,13 @@ export function NoisePanel() {
         >
           Apply
         </button>
-        <button className="btn" onClick={() => setParams({ ...DEFAULT_NOISE, seed: randomSeed() })}>
+        <button
+          className="btn"
+          onClick={() => {
+            setParams({ ...DEFAULT_NOISE, seed: randomSeed() });
+            setNoiseOffset(0, 0);
+          }}
+        >
           Reset
         </button>
       </div>

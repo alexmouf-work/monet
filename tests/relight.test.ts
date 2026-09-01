@@ -175,3 +175,35 @@ describe('adjustMap', () => {
     expect(down(up(0.7))).toBeCloseTo(0.6667, 3);
   });
 });
+
+describe('a negative relight amount is the opposite relight (owner request 2026-08-11)', () => {
+  const grey = (v: number) => {
+    const px = new Uint8ClampedArray([v, v, v, 255]);
+    return px;
+  };
+
+  it('−1 moves as far the other way as +1 moves toward the map', () => {
+    const before = grey(128);
+    const pos = new Uint8ClampedArray(4);
+    const neg = new Uint8ClampedArray(4);
+    const map = (l: number) => Math.min(1, l + 0.2);
+    applyRelight(before, pos, { measure: 'lightness', map, amount: 1 });
+    applyRelight(before, neg, { measure: 'lightness', map, amount: -1 });
+    expect(pos[0]).toBeGreaterThan(before[0]);
+    expect(neg[0]).toBeLessThan(before[0]);
+    expect(Math.abs((pos[0] + neg[0]) / 2 - before[0])).toBeLessThanOrEqual(1);
+  });
+
+  it('amount 0 is the identity, and below −1 clamps', () => {
+    const before = grey(128);
+    const zero = new Uint8ClampedArray(4);
+    const one = new Uint8ClampedArray(4);
+    const far = new Uint8ClampedArray(4);
+    const map = (l: number) => Math.min(1, l + 0.2);
+    applyRelight(before, zero, { measure: 'lightness', map, amount: 0 });
+    applyRelight(before, one, { measure: 'lightness', map, amount: -1 });
+    applyRelight(before, far, { measure: 'lightness', map, amount: -5 });
+    expect([...zero]).toEqual([...before]);
+    expect([...far]).toEqual([...one]);
+  });
+});

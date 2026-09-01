@@ -33,7 +33,7 @@ in exchange never touches RGB.
 | Control | Behaviour |
 | ------- | --------- |
 | **Result colour** | swatch + hex + eyedropper |
-| **Amount** | 0–100 % slider, default 100 |
+| **Amount** | **−100…100 %** slider, default 100; negative extrapolates away from the colour (owner request 2026-08-11) |
 | **Preview** | toggle, default on |
 | **Recolour** | bakes |
 
@@ -155,7 +155,7 @@ saturation and keeps its own lightness; the amount slider linearly blends the
 effect.
 
 ```ts
-export interface TintParams { result: Rgb; amount: number /*0–1*/; }
+export interface TintParams { result: Rgb; amount: number /*−1…1*/; }
 
 export function applyTint(before: Uint8ClampedArray, after: Uint8ClampedArray,
                           p: TintParams): void {
@@ -177,6 +177,9 @@ Properties (assert in tests):
 - amount 1 on a greyscale image ⇒ a monochrome ramp of the result colour whose HSL
   lightness per pixel equals the source lightness (±1/255);
 - amount 0 ⇒ identity;
+- **amount −1 ⇒ as far from the result colour as +1 goes toward it** — the source is the
+  midpoint of the two, channel by channel, bar clamping. Negative amounts extrapolate rather
+  than doing nothing (owner request 2026-08-11); below −1 clamps.;
 - tinting with pure grey (`s = 0`) desaturates while preserving lightness;
 - alpha untouched everywhere.
 
@@ -242,7 +245,7 @@ is over a handful of chips — no optimisation needed.
 Recolour's cousin. It **never touches hue**: it changes only how bright a pixel is, and
 carries the whole image along one curve so shading stays coherent.
 
-### 7.1 What "brightness" means
+### 8.1 What "brightness" means
 
 A choice, because the word is ambiguous and the two readings disagree:
 
@@ -255,7 +258,7 @@ Setting a new brightness: `lightness` goes through HSL and is exact. `luma` scal
 channels down (hue-preserving) or blends toward white to go up — the only way to raise a
 saturated colour's luma at all.
 
-### 7.2 Mode A — Match
+### 8.2 Mode A — Match
 
 Pick a colour in the image (`from`) and the brightness to give it (`to`, itself picked from
 any colour). The pair defines a monotone map over the whole 0–1 range, applied to every
@@ -274,21 +277,23 @@ Degenerate anchors (0 or 1) fall back to a two-segment line, since no exponent m
 Optional **"only this colour (and near it)"** restricts the effect with Replace's per-channel
 Chebyshev tolerance; off by default.
 
-### 7.3 Mode B — Adjust
+### 8.3 Mode B — Adjust
 
 Brightness (shift) and Contrast (pivot at mid-grey, factor `(1+c)/(1−c)` so ±c are
 reciprocal) over the whole image, same measure choice, same hue guarantee.
 
-### 7.4 Preview, bake and amount
+### 8.4 Preview, bake and amount
 
-Shares §5's session. `amount` blends the relit pixel against the original.
+Shares §6's session. `amount` blends the relit pixel against the original, **−100…100 %**:
+negative extrapolates away from the relit result — the opposite relight — rather than doing
+nothing (owner request 2026-08-11). Below −1 clamps; 0 is the identity from either side.
 
 **Baking consumes the adjustment**: the session re-snapshots from the baked pixels so bakes
 can stack, so an unchanged panel would relight the already-relit image a second time the
 instant you click. Match re-anchors `from` on the colour it became (making the map an
 identity); Adjust zeroes its sliders. What you see after the bake is what you baked.
 
-### 7.5 Acceptance
+### 8.5 Acceptance
 
 - A pale blue matched to a dark green's brightness becomes a **dark blue at that brightness**,
   hue within a degree, and the rest of the sprite darkens with it in the same order.

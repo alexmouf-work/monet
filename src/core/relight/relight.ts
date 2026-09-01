@@ -106,7 +106,11 @@ export interface RelightParams {
   measure: Measure;
   /** Brightness in, brightness out — both 0..1. */
   map: (l: number) => number;
-  /** 0–1 blend between the original pixel and the relit one. */
+  /**
+   * −1…1 blend between the original pixel and the relit one. Negative extrapolates away from
+   * the relit result — the opposite relight — rather than doing nothing (owner request
+   * 2026-08-11).
+   */
   amount: number;
   /**
    * Restrict the effect to colours near these, like Recolour's replace tolerance. Absent =
@@ -135,7 +139,7 @@ export function applyRelight(
   after: Uint8ClampedArray,
   p: RelightParams,
 ): void {
-  const amount = clamp01(p.amount);
+  const amount = Math.max(-1, Math.min(1, p.amount));
   const limited = p.limit && p.limit.targets.length > 0 ? p.limit : null;
   for (let i = 0; i < before.length; i += 4) {
     const a = before[i + 3];

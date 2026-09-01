@@ -1168,6 +1168,40 @@ kbd {
   text-align: right;
 }
 
+/* Selection markers on the picker. Absolutely positioned over the canvases so the gradients
+   stay cached; `translate(-50%,-50%)` centres them on the point they report. */
+.colorpanel__svwrap,
+.colorpanel__huewrap {
+  position: relative;
+  line-height: 0;
+}
+
+.colorpanel__dot {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  margin: 0;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 0.75),
+    0 1px 3px rgb(0 0 0 / 0.4);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.colorpanel__huedot {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 5px;
+  border-radius: 3px;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.75);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
 .colorpanel__sv,
 .colorpanel__hue {
   width: 100%;

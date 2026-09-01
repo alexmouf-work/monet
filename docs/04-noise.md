@@ -13,9 +13,10 @@ objects exist). It applies to the whole canvas — no selection interaction in v
 | Control | Range / values | Default |
 | ------- | -------------- | ------- |
 | **Type** | 13 types, grouped dropdown (§3) | `perlin` |
-| **Rotation** | 0–360°, slider + numeric | 0 |
+| **Rotation** | −360…360°, slider + numeric | 0 |
 | **Scale** ("zoom") | slider over log₂ ∈ [−3, +3] → `z = 2^s` ∈ [0.125, 8] | 1 |
-| **Intensity** | 0–100 % | 50 |
+| **Intensity** | **−100…100 %** (§7) | 50 |
+| **Offset** | X/Y numeric boxes, and dragging the canvas (§7) | 0, 0 |
 | **Affect** | checkboxes **Brightness**, **Hue** (both allowed; both-off disables Apply) | Brightness ✓, Hue ✗ |
 | **Seed** | uint32 numeric + 🎲 re-roll (`crypto.getRandomValues`) | random at panel-open |
 | Buttons | **Apply** (bake), **Reset** (back to defaults + fresh preview) | |
@@ -26,7 +27,7 @@ Every noise type is a scalar field `n(x, y) ∈ [−1, 1]` evaluated per documen
 The pattern is positioned by centring, rotating and zooming the *lookup*:
 
 ```
-q  = (x + 0.5 − W/2,  y + 0.5 − H/2)            // centred doc coords
+q  = (x + 0.5 − W/2 + oX,  y + 0.5 − H/2 + oY)  // centred doc coords, plus the offset (§7)
 u  =  qx·cosθ + qy·sinθ                          // inverse-rotate the lookup ⇒
 v  = −qx·sinθ + qy·cosθ                          //   the pattern rotates CW by θ
 nx = u / (CELL · z),  ny = v / (CELL · z)        // CELL = 8 px base feature size
@@ -38,7 +39,7 @@ spins the pattern about the canvas centre. Rotating `radial`/`rings` is a no-op 
 symmetry (fine). The `white` type uses `CELL = 1` so it is per-pixel at z = 1.
 
 The field is evaluated once into a `Float32Array(W*H)` **noise map** whenever any of
-{type, rotation, scale, seed, doc size} changes; intensity/affect changes reuse the
+{type, rotation, scale, seed, **offset**, doc size} changes; intensity/affect changes reuse the
 map (they only alter application, §5). At 512² this is ≤ 15 ms for the priciest
 type — synchronous is fine.
 
@@ -155,7 +156,8 @@ Keep the switch in one function so the noise-map builder stays a single double l
 
 ```ts
 export interface NoiseParams { type: NoiseType; rotationDeg: number; z: number;
-                               seed: number; intensity: number;      // 0–100
+                               seed: number; intensity: number;      // −100…100
+                               offsetX: number; offsetY: number;     // §7
                                brightness: boolean; hue: boolean; }
 
 export function buildNoiseMap(W: number, H: number, p: NoiseParams): Float32Array {
@@ -163,7 +165,7 @@ export function buildNoiseMap(W: number, H: number, p: NoiseParams): Float32Arra
   const th = (p.rotationDeg * Math.PI) / 180, c = Math.cos(th), s = Math.sin(th);
   const CELL = 8 * p.z;
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-    const qx = x + 0.5 - W / 2, qy = y + 0.5 - H / 2;
+    const qx = x + 0.5 - W / 2 + p.offsetX, qy = y + 0.5 - H / 2 + p.offsetY;
     const u = qx * c + qy * s, v = -qx * s + qy * c;
     out[y * W + x] = sampleNoise(p.type, u / CELL, v / CELL, p.seed,
                                  { qx, qy, u, v, z: p.z, W, H });
@@ -215,7 +217,30 @@ a tooltip. Brightness at |n·k| = 1 clamps at black/white — fine.
 4. **Leave tab / Reset / doc switch**: drop previews and snapshots; the document is
    untouched unless Apply was pressed. Undo after Apply restores exactly.
 
-## 7. Acceptance
+## 7. Panning and negative intensity (owner request 2026-08-11)
+
+**Offset.** `offsetX`/`offsetY` are added to the centred lookup coordinates, so the field is
+read from somewhere else — the pattern slides while the document stays put. Two ways to set it,
+one piece of state (`app/noisePanState.ts`, a leaf module so the tool and the panel cannot
+disagree and neither imports the other):
+
+- **Drag the canvas.** The Noise panel pushes `tools/noisePanTool.ts` as a *transient* tool on
+  mount and pops it on unmount, so opening the tab hands the canvas over and leaving hands it
+  straight back to whatever was painting. The grab is direct — the pattern follows the pointer
+  — which means the offset moves the OTHER way, since a larger offset reads further along the
+  field. A crosshair overlay marks where the field's origin now sits.
+- **Type it.** X/Y numeric boxes in the panel, negatives included, plus a ⌖ button back to the
+  origin. *Reset* also returns it to 0,0.
+
+Whole pixels only (the offset is rounded), so panning never resamples: `offsetX: 3` gives the
+same values the unoffset field had three pixels along, exactly.
+
+**Negative intensity.** `k = intensity / 100` is simply allowed to go negative, which flips the
+sign of every sample: light where the field would have been dark, the same pattern read the
+other way round rather than a different one. No special case in `applyNoise`; 0 remains the
+identity from either side.
+
+## 8. Acceptance
 
 - Determinism: same {type, seed, rotation, scale, size} ⇒ byte-identical noise map
   (unit test with locked expected values for `hash2`, `perlin`, `fbm` at fixed
@@ -224,7 +249,11 @@ a tooltip. Brightness at |n·k| = 1 clamps at black/white — fine.
   gallery, manual eyeball once, then locked as goldens).
 - Rotation 90° on `stripes` turns vertical bars horizontal; scale 2 doubles bar
   width; `gradient` at rotation 0 runs dark-top → light-bottom at Brightness mode.
-- Intensity 0 ⇒ preview identical to source; 100 ⇒ full ±0.5 L swing.
+- Intensity 0 ⇒ preview identical to source; 100 ⇒ full ±0.5 L swing; **−100 ⇒ the mirror of
+  +100 about the source lightness** (unit-tested per pixel, away from the clamps).
+- **Offset**: `offsetX: 3` reproduces the unoffset field shifted three pixels; a zero offset is
+  byte-identical to no offset; dragging the canvas moves the readout by the drag delta, negated
+  (`noise-pan-negatives.mjs`).
 - Hue-only mode leaves L untouched (assert per-pixel HSL L equal within ±1/255).
 - Transparent pixels stay untouched byte-for-byte; alpha channel never changes.
 - Apply → Undo restores the pre-bake buffers exactly; Apply twice stacks.

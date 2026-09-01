@@ -7,6 +7,7 @@ import { eyedropperTool } from './eyedropperTool';
 import { selectTool } from './selectTool';
 import { shapeTool } from './shapeTool';
 import { textTool } from './textTool';
+import { noisePanTool } from './noisePanTool';
 
 registerTool(panTool);
 registerTool(penTool);
@@ -17,5 +18,6 @@ registerTool(eyedropperTool);
 registerTool(selectTool);
 registerTool(shapeTool);
 registerTool(textTool);
+registerTool(noisePanTool);
 
 export { getTool, registerTool } from './registry';

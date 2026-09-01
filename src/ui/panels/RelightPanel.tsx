@@ -258,7 +258,16 @@ export function RelightPanel() {
         )}
       </div>
 
-      <Slider label="Amount" suffix="%" min={0} max={100} value={amount} onChange={setAmount} />
+      {/* Negative extrapolates away from the relit result — the opposite relight (docs/05 §8). */}
+      <Slider
+        label="Amount"
+        suffix="%"
+        min={-100}
+        max={100}
+        emptyValue={100}
+        value={amount}
+        onChange={setAmount}
+      />
 
       <label className="check">
         <input type="checkbox" checked={preview} onChange={(e) => setPreview(e.target.checked)} />

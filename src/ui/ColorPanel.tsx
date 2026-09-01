@@ -159,32 +159,51 @@ export function ColorPanel() {
         </div>
       </div>
 
-      <canvas
-        ref={svRef}
-        width={SV_W}
-        height={SV_H}
-        className="colorpanel__sv"
-        onPointerDown={(e) => {
-          e.currentTarget.setPointerCapture(e.pointerId);
-          dragSV(e);
-        }}
-        onPointerMove={(e) => {
-          if (e.buttons & 1) dragSV(e);
-        }}
-      />
-      <canvas
-        ref={hueRef}
-        width={SV_W}
-        height={HUE_H}
-        className="colorpanel__hue"
-        onPointerDown={(e) => {
-          e.currentTarget.setPointerCapture(e.pointerId);
-          dragHue(e);
-        }}
-        onPointerMove={(e) => {
-          if (e.buttons & 1) dragHue(e);
-        }}
-      />
+      {/* The markers are DOM, not painted into the canvases: the SV gradient is only rebuilt
+          when the HUE changes, and drawing a ring into it would force a full repaint on every
+          colour change. They were missing entirely until 2026-08-11 — the picker showed no sign
+          of which colour was selected (owner report; the native picker behind ColorField has
+          always had one, which is why it only bit here). */}
+      <div className="colorpanel__svwrap">
+        <canvas
+          ref={svRef}
+          width={SV_W}
+          height={SV_H}
+          className="colorpanel__sv"
+          onPointerDown={(e) => {
+            e.currentTarget.setPointerCapture(e.pointerId);
+            dragSV(e);
+          }}
+          onPointerMove={(e) => {
+            if (e.buttons & 1) dragSV(e);
+          }}
+        />
+        <span
+          className="colorpanel__dot"
+          style={{ left: `${s * 100}%`, top: `${(1 - v) * 100}%`, background: color }}
+          aria-hidden
+        />
+      </div>
+      <div className="colorpanel__huewrap">
+        <canvas
+          ref={hueRef}
+          width={SV_W}
+          height={HUE_H}
+          className="colorpanel__hue"
+          onPointerDown={(e) => {
+            e.currentTarget.setPointerCapture(e.pointerId);
+            dragHue(e);
+          }}
+          onPointerMove={(e) => {
+            if (e.buttons & 1) dragHue(e);
+          }}
+        />
+        <span
+          className="colorpanel__huedot"
+          style={{ left: `${(hue / 360) * 100}%` }}
+          aria-hidden
+        />
+      </div>
 
       <Swatches label="Palette" colors={PAINT_PALETTE} onPick={setColor} />
 

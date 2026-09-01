@@ -42,7 +42,8 @@ src/core/                              PURE: no DOM, no React, all unit-tested
                                        angles route to the exact transposes (lossless)
   color/{convert,palette}.ts           HSL/HSV/hex, MS-Paint 20
   shapes/{geometry,spline,transformOps}.ts  contours, Catmull-Rom, handle scaling
-  noise/{fields,apply}.ts              13 fields from one hash, brightness/hue apply
+  noise/{fields,apply}.ts              the 13 fields; map builder takes a sampling OFFSET
+                                       and a signed intensity (docs/04 §7)              13 fields from one hash, brightness/hue apply
   recolor/{replace,tint,opacity}.ts    replace recolours matched pixels RELATIVE to the
                                        target they matched (shading survives a swap);
                                        `flat` snaps them all onto the result; opacity
@@ -81,6 +82,8 @@ src/tools/                             one module per tool over a common interfa
   registry.ts index.ts types.ts        registration; unknown ids degrade to a no-op
   strokeEngine.ts brushTools.ts bucketTool.ts eyedropperTool.ts
   selectTool.ts marquee.ts shapeTool.ts textTool.ts panTool.ts
+  noisePanTool.ts                      drags the noise field; pushed transiently by the
+                                       Noise panel and popped when it unmounts (docs/04 §7)
   modelPaint.ts                        3D→2D paint routing: FaceHit → texel → stroke engine;
                                        per-face segmentation, background doc creation
 
@@ -97,6 +100,8 @@ src/app/                               stores + action layer
                                        context menu share one undoable route per edit
   modelExportActions.ts                java / bedrock / .monet_model / render-to-PNG / bundle zip
   modelBundleActions.ts                open a model from local files: the draft, its needs, the zip
+  noisePanState.ts                     the noise sampling offset: one home for the panel's
+                                       X/Y boxes and the canvas drag
   modelViewState.ts overlayRegistry.ts leaf modules: hover/renderer registry, overlay painters,
                                        live gizmo-drag readout, previewed display slot
   launchFiles.ts                       OS "open with" launches → docs bound to their handles
@@ -159,7 +164,10 @@ at pixel corners land on that pixel — the helpers aim at centres, where the bu
 two-shades-of-green swap coming out as two shades of purple) ·
 `model-bundle` (open a model from local files, placeholder a missing texture, paint it, get it
 all back in a zip, and write-back: off by default, then on from the sidebar, asserted by decoding
-the PNG a fake directory handle received) · `numfields-opacity` (a field can be emptied while typing and resolves to 1/255 on blur; the
+the PNG a fake directory handle received) · `noise-pan-negatives` (the picker markers track the selected colour; the Noise tab hands the
+canvas to the pan tool and dragging moves both the pattern and its readout, which is typeable
+and takes negatives; negative intensity/tint/relight amounts read the effect the other way) ·
+`numfields-opacity` (a field can be emptied while typing and resolves to 1/255 on blur; the
 alpha box is typeable on the 0–255 scale; Recolour's Opacity mode halves one colour's alpha,
 leaves the other alone, and consumes its multiplier on bake) ·
 `selection-transform` (wheel rotates a live selection, F/Shift+F mirror it, a 90° round trip

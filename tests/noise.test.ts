@@ -18,6 +18,8 @@ const params = (over: Partial<NoiseParams> = {}): NoiseParams => ({
   z: 1,
   seed: 12345,
   intensity: 100,
+  offsetX: 0,
+  offsetY: 0,
   brightness: true,
   hue: false,
   ...over,
@@ -224,5 +226,74 @@ describe('applyNoise', () => {
     const p = params({ intensity: 100, brightness: false, hue: false });
     applyNoise(before, after, buildNoiseMap(8, 8, p), p);
     expect([...after]).toEqual([...before]);
+  });
+});
+
+describe('negative intensity and the sampling offset (owner request 2026-08-11)', () => {
+  const flat = (n: number) => {
+    const px = emptyPixels(n, n);
+    for (let i = 0; i < n * n; i++) px.set([128, 128, 128, 255], i * 4);
+    return px;
+  };
+
+  it('a negative intensity is the same pattern inverted, not a different one', () => {
+    const N = 16;
+    const map = buildNoiseMap(N, N, params());
+    const before = flat(N);
+    const pos = emptyPixels(N, N);
+    const neg = emptyPixels(N, N);
+    applyNoise(before, pos, map, params({ intensity: 60 }));
+    applyNoise(before, neg, map, params({ intensity: -60 }));
+    const mid = rgbToHsl(128, 128, 128)[2];
+    let checked = 0;
+    for (let i = 0; i < N * N * 4; i += 4) {
+      const lp = rgbToHsl(pos[i], pos[i + 1], pos[i + 2])[2];
+      const ln = rgbToHsl(neg[i], neg[i + 1], neg[i + 2])[2];
+      // Symmetric about the original lightness, as far as clamping allows.
+      if (lp > 0.02 && lp < 0.98 && ln > 0.02 && ln < 0.98) {
+        expect(Math.abs(lp - mid - (mid - ln))).toBeLessThan(0.02);
+        checked++;
+      }
+    }
+    expect(checked).toBeGreaterThan(N * N * 0.5);
+  });
+
+  it('intensity 0 is the identity whichever side it is approached from', () => {
+    const N = 8;
+    const map = buildNoiseMap(N, N, params());
+    const before = flat(N);
+    const out = emptyPixels(N, N);
+    applyNoise(before, out, map, params({ intensity: 0 }));
+    expect([...out]).toEqual([...before]);
+  });
+
+  it('the offset shifts the field by whole pixels, giving back the same values', () => {
+    const N = 24;
+    const base = buildNoiseMap(N, N, params({ z: 2 }));
+    const shifted = buildNoiseMap(N, N, params({ z: 2, offsetX: 3, offsetY: 0 }));
+    // A pixel at x in the shifted map samples where x+3 sampled before.
+    for (let y = 4; y < N - 4; y++) {
+      for (let x = 0; x < N - 3; x++) {
+        expect(shifted[y * N + x]).toBeCloseTo(base[y * N + x + 3], 5);
+      }
+    }
+  });
+
+  it('a negative offset shifts the other way', () => {
+    const N = 24;
+    const base = buildNoiseMap(N, N, params({ z: 2 }));
+    const shifted = buildNoiseMap(N, N, params({ z: 2, offsetX: 0, offsetY: -2 }));
+    for (let y = 2; y < N; y++) {
+      for (let x = 0; x < N; x++) {
+        expect(shifted[y * N + x]).toBeCloseTo(base[(y - 2) * N + x], 5);
+      }
+    }
+  });
+
+  it('a zero offset is exactly the unoffset field', () => {
+    const N = 12;
+    expect([...buildNoiseMap(N, N, params({ offsetX: 0, offsetY: 0 }))]).toEqual([
+      ...buildNoiseMap(N, N, params()),
+    ]);
   });
 });

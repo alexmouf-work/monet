@@ -7,7 +7,11 @@ import { hslToRgb, rgbToHsl } from '../color/convert';
 
 export interface TintParams {
   result: Rgb;
-  /** 0–1. */
+  /**
+   * −1…1. Above 0 it blends toward the result colour; below 0 it EXTRAPOLATES away from it,
+   * which is the natural reading of a negative amount and is what the owner asked for
+   * (2026-08-11). Out-of-gamut results clamp per channel.
+   */
   amount: number;
 }
 
@@ -17,7 +21,7 @@ export function applyTint(
   p: TintParams,
 ): void {
   const [th, ts] = rgbToHsl(p.result.r, p.result.g, p.result.b);
-  const k = Math.max(0, Math.min(1, p.amount));
+  const k = Math.max(-1, Math.min(1, p.amount));
   for (let i = 0; i < before.length; i += 4) {
     const a = before[i + 3];
     if (a === 0) {

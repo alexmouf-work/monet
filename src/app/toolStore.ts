@@ -6,7 +6,17 @@ import { DEFAULT_FONT } from '../ui/fonts';
 import { invalidate } from './bus';
 
 export type ToolId =
-  'select' | 'pan' | 'pen' | 'marker' | 'eraser' | 'bucket' | 'eyedropper' | 'shape' | 'text';
+  | 'select'
+  | 'pan'
+  | 'pen'
+  | 'marker'
+  | 'eraser'
+  | 'bucket'
+  | 'eyedropper'
+  | 'shape'
+  | 'text'
+  /** Drags the noise field around; pushed transiently by the Noise panel (docs/04 §7). */
+  | 'noisePan';
 
 export type FeatureTab =
   'brushes' | 'shapes' | 'text' | 'noise' | 'recolour' | 'relight' | 'canvas' | 'model' | 'uv';
