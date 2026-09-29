@@ -50,6 +50,8 @@ src/core/                              PURE: no DOM, no React, all unit-tested
                                        multiplies one colour's ALPHA by 0–255, RGB untouched
   relight/relight.ts                   brightness-only maps (hue never moves): match + adjust
   io/{monetFile,ico,bmp,pdfFit,pdfExport}.ts
+  io/embed.ts                          embed mode's pure parts: ?embed=1&w=&h= parsing, allowed
+                                       host origins, the postMessage message types (docs/07 §12)
 
 src/core/model3d/                      PURE 3D: types, vec/mat4, orbit camera, java model
   {types,vec,camera,javaModel,vanillaParents,geometry,pick}.ts    parsing, mesh, ray picking
@@ -90,6 +92,10 @@ src/tools/                             one module per tool over a common interfa
 src/app/                               stores + action layer
   docStore viewStore toolStore settingsStore    zustand
   bus.ts                               invalidate + toast fan-out
+  embed.ts                             embed mode (docs/07 §12): blank w×h doc at boot, talks to
+                                       the framing host (LEMMA) by postMessage — ready/load/save/
+                                       cancel — origin-checked both ways; App hides sidebar, tabs
+                                       and Sync and skips restore/autosave when embedded
   fileActions exportActions editActions selectionActions canvasActions
   adjustSession.ts                     shared preview/bake for noise + recolour
   themeMode.ts                         system|light|dark, data-theme stamping

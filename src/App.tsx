@@ -12,6 +12,7 @@ import { startModelTextureSync } from './app/modelTextureSync';
 import { installUVGuides } from './ui/uvGuides';
 import { startFileHandling } from './app/launchFiles';
 import { watchInstallability } from './app/installPrompt';
+import { embedCancel, embedParams, embedSave, startEmbed } from './app/embed';
 import { selectAll } from './tools/marquee';
 import { isTypingTarget } from './ui/Workspace';
 import './tools';
@@ -79,8 +80,17 @@ export function App() {
   const hasDocs = useDocStore((s) => s.order.length > 0);
   const activeIsModel = useDocStore((s) => (s.activeId ? s.activeId in s.models : false));
   const loaded = useSettingsStore((s) => s.loaded);
+  // Embedded in another app (docs/07 §12): one blank canvas, no sources, tabs or recovery.
+  const [embed] = useState(() => embedParams());
 
   useEffect(() => {
+    if (!embed) return;
+    void useSettingsStore.getState().load();
+    return startEmbed(embed);
+  }, [embed]);
+
+  useEffect(() => {
+    if (embed) return;
     void useSettingsStore.getState().load();
     // Before anything that can await: a file the OS handed us waits in the launch queue only
     // until a consumer exists, and only the first consumer counts (docs/07 §10).
@@ -104,7 +114,7 @@ export function App() {
       stopInstallWatch();
       stopTextureSync();
     };
-  }, []);
+  }, [embed]);
 
   useEffect(() => {
     if (!loaded) return;
@@ -148,6 +158,7 @@ export function App() {
   // Guard against losing work on reload, and take one last snapshot.
   useEffect(() => {
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (embed) return;
       const dirty = Object.values(useDocStore.getState().docs).some((d) => d.dirty);
       if (!dirty) return;
       void autosaveNow();
@@ -156,7 +167,7 @@ export function App() {
     };
     window.addEventListener('beforeunload', onBeforeUnload);
     return () => window.removeEventListener('beforeunload', onBeforeUnload);
-  }, []);
+  }, [embed]);
 
   // Paste event as the fallback when the async clipboard API is unavailable.
   useEffect(() => {
@@ -228,7 +239,10 @@ export function App() {
       newModel: () => newModelDoc(),
       openModel: () => setDialog('loadModel'),
       open: () => void openLocalFiles(),
-      save: () => withActive((id) => void saveDoc(useDocStore.getState().docs[id])),
+      save: () =>
+        embed
+          ? void embedSave()
+          : withActive((id) => void saveDoc(useDocStore.getState().docs[id])),
       // With writable sources connected, Save As offers them; otherwise go straight to a file.
       saveAs: () =>
         withActive(() =>
@@ -278,7 +292,7 @@ export function App() {
       },
       about: () => toast('Monet — Paint 3D-style editor for Minecraft textures.'),
     }),
-    [notYet, requestClose, withActive],
+    [notYet, requestClose, withActive, embed],
   );
 
   useShortcuts(actions);
@@ -288,6 +302,7 @@ export function App() {
   return (
     <div className="app">
       <TopBar
+        embed={embed ? { onSave: () => void embedSave(), onCancel: embedCancel } : undefined}
         onMenu={() => setMenuOpen((v) => !v)}
         onSettings={() => setDialog('settings')}
         onExport={actions.exportAs}
@@ -307,17 +322,19 @@ export function App() {
       {menuOpen && <AppMenu actions={actions} onClose={() => setMenuOpen(false)} />}
       <Toolbar actions={actions} />
 
-      <div className="main">
-        <SourcesSidebar
-          onAddJar={() => void actions.addJar()}
-          onAddRepo={() => setDialog('repo')}
-          onOpenModel={() => setDialog('loadModel')}
-          onAddFolder={() => void actions.addFolder()}
-          onSync={(id) => setSyncSourceId(id)}
-        />
+      <div className={embed ? 'main main--embed' : 'main'}>
+        {!embed && (
+          <SourcesSidebar
+            onAddJar={() => void actions.addJar()}
+            onAddRepo={() => setDialog('repo')}
+            onOpenModel={() => setDialog('loadModel')}
+            onAddFolder={() => void actions.addFolder()}
+            onSync={(id) => setSyncSourceId(id)}
+          />
+        )}
 
         <section className="center">
-          <DocTabs onNew={() => setDialog('new')} onClose={requestClose} />
+          {!embed && <DocTabs onNew={() => setDialog('new')} onClose={requestClose} />}
           {hasDocs ? (
             // Both workspaces stay mounted so switching tabs never resets renderer state;
             // CSS hides the inactive one and its ResizeObserver skips zero-size layouts.

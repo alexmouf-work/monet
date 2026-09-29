@@ -24,11 +24,14 @@ export function TopBar({
   onSettings,
   onExport,
   onSync,
+  embed,
 }: {
   onMenu(): void;
   onSettings(): void;
   onExport(): void;
   onSync(): void;
+  /** Embed mode (docs/07 §12): Save and Cancel hand the drawing back; no repository controls. */
+  embed?: { onSave(): void; onCancel(): void };
 }) {
   const tab = useToolStore((s) => s.tab);
   const active = useToolStore((s) => s.active);
@@ -78,14 +81,30 @@ export function TopBar({
       </nav>
 
       <div className="topbar__right">
-        <button
-          className="btn"
-          onClick={onSync}
-          disabled={!hasDoc}
-          title="Sync repository branches"
-        >
-          ⟳ Sync
-        </button>
+        {embed ? (
+          <>
+            <button className="btn" onClick={embed.onCancel} title="Close without saving">
+              Cancel
+            </button>
+            <button
+              className="btn btn--primary"
+              onClick={embed.onSave}
+              disabled={!hasDoc}
+              title="Save the drawing and return (Ctrl+S)"
+            >
+              Save
+            </button>
+          </>
+        ) : (
+          <button
+            className="btn"
+            onClick={onSync}
+            disabled={!hasDoc}
+            title="Sync repository branches"
+          >
+            ⟳ Sync
+          </button>
+        )}
         <button
           className="iconbtn"
           onClick={onExport}

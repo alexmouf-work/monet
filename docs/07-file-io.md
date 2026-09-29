@@ -209,3 +209,31 @@ opened by drag-and-drop or `Ctrl+O` as before. Nothing regresses.
   tabs in one window.
 - The built `manifest.webmanifest` contains both `file_handlers` entries, every extension above,
   and an `action` that resolves (asserted by `tests/manual/prodboot.mjs`).
+
+## 12. Embed mode (`?embed=1&w=&h=`) — for LEMMA's drawing element, 2026-09-29
+
+LEMMA (the owner's study-notes app) draws its notes' pictures in Monet, framed in an `<iframe>`
+(`https://monet.mouftools.com/?embed=1&w=1024&h=1024`). Appended here rather than inserted before
+§11 so no existing cross-reference moves.
+
+- **URL**: `embed=1` switches it on; `w` and `h` are the blank canvas's size in whole pixels,
+  clamped to 1…`MAX_DIM`, default 1024 (`core/io/embed.ts`, pure and unit-tested).
+- **What changes**: one blank document of `w×h` on a white background is created at boot; the
+  sources sidebar, the document tabs and the Sync button are not shown (the canvas takes their
+  room); nothing is restored (no Recover dialog, no autosave, no repository or jar sources, no
+  GitHub sign-in callback) and there is no leave-page warning. The top bar's right side shows
+  **Cancel** and **Save**; `Ctrl+S` is Save.
+- **Protocol** (`app/embed.ts`), `postMessage` only, never to `*`:
+  - Monet → host `{type:'monet:ready'}` once listening;
+  - host → Monet `{type:'monet:load', png?: ArrayBuffer, w, h}`: a PNG replaces the blank
+    document (editing an existing drawing); no PNG but another size replaces it with a blank
+    document of that size;
+  - Save → host `{type:'monet:save', png, w, h}` (the flattened composite, §2, as PNG bytes,
+    transferred), and the document is marked saved;
+  - Cancel → host `{type:'monet:cancel'}`.
+- **Origins**: the host must be one of `VITE_EMBED_ORIGINS` (comma-separated) when that is set,
+  otherwise the origin of the page that framed Monet (`document.referrer`). Messages from any
+  other origin or window are ignored, and Monet posts only to that origin.
+- **Acceptance**: framed by LEMMA, Monet opens a 1024 × 1024 white canvas with no sidebar or
+  tabs; Save inserts the drawing into the note as a 1024 × 1024 PNG; reopening the drawing
+  loads it back; Cancel closes without changes.

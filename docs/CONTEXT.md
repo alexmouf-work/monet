@@ -68,6 +68,7 @@ browser. See docs/ARCHITECTURE.md for the as-built map and ROADMAP.csv for per-m
 | 2026-08-10 | **M14 — faces to textures**: double-click / middle-click / Enter (viewport-centre fallback) open the texture behind a face with its uv rect selected; open texture docs are live-linked both ways with the 3D view; UV guides overlay the 2D editor; region write-back plumbed for sheet atlases. |
 | 2026-08-10 | **M13 — 3D viewport**: model documents beside image tabs; Java model parsing with jar parent chains + builtin fallbacks; raw WebGL2 renderer (MC shading, cutout, grid/bounds/axes, view cube); Onshape navigation; hover picking; ortho/standard views; per-tab cameras. |
 | 2026-08-09 | M0 scaffold; M1 compositor/viewport/shell; M2 stroke engine + brushes + file IO; M3 colour/eyedropper/bucket; M4 shapes; M5 text (+ GUI harness); M6 selection/clipboard/flatten; M7 canvas ops; M8 noise; M9 recolour; M10 export formats; M11 jar/folder/GitHub sources; M12 PWA + deploy. |
+| 2026-09-29 | **Embed mode for LEMMA** (`?embed=1&w=&h=`, docs/07 §12): the owner's study-notes app frames Monet to draw note pictures; a blank w×h canvas without sidebar, tabs or Sync, Cancel/Save in the top bar, and a postMessage protocol (ready / load PNG / save PNG / cancel) origin-checked both ways. Branch `lemma-embed`, not yet merged (LEMMA plan W3 T3.7). |
 
 ## Owner-visible behaviour worth remembering
 

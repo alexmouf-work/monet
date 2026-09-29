@@ -138,6 +138,15 @@ textarea {
   }
 }
 
+/* Embed mode (docs/07 §12): no sources sidebar and no document tabs, so the canvas takes
+   their room. */
+.main.main--embed {
+  grid-template-columns: 1fr var(--options-w);
+}
+.main--embed .center {
+  grid-template-rows: 1fr;
+}
+
 /* ---------- top bar ---------- */
 
 .topbar {
