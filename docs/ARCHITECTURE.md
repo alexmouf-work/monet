@@ -127,6 +127,7 @@ src/integrations/
 
 src/ui/                                React; no business logic
   App.tsx TopBar Toolbar AppMenu DocTabs Workspace StatusBar OptionsPanel ColorPanel
+  StatusBar.tsx                        also links the MOUFTOOLS privacy policy and terms (new tab)
   GithubAccount.tsx                    sign-in / signed-in block, shared by two dialogs
   ModelWorkspace.tsx                   3D workspace: renderer lifecycle, Onshape navigation,
                                        hover picking, translate gizmo, DOM view cube;

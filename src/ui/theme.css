@@ -616,7 +616,16 @@ input[type='text'] {
 
 .statusbar__save {
   margin-left: auto;
+}
+
+/* links to the MOUFTOOLS privacy policy and terms; open in a new tab so the work stays put */
+.statusbar__legal {
   border-right: none;
+}
+
+.statusbar__legal a {
+  color: var(--accent);
+  text-decoration: none;
 }
 
 .statusbar__flags {

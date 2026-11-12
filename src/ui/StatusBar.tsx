@@ -75,6 +75,15 @@ export function StatusBar() {
         <span className="statusbar__cell statusbar__save">
           {model.dirty ? '● unsaved' : '✓ saved'}
         </span>
+        <span className="statusbar__cell statusbar__legal">
+          <a href="https://mouftools.com/privacy#monet" target="_blank" rel="noopener">
+            Privacy
+          </a>
+          ·
+          <a href="https://mouftools.com/terms#monet" target="_blank" rel="noopener">
+            Terms
+          </a>
+        </span>
       </footer>
     );
   }
@@ -120,6 +129,15 @@ export function StatusBar() {
       </span>
       <span className="statusbar__cell statusbar__save">
         {doc ? (doc.dirty ? '● unsaved' : '✓ saved') : ''}
+      </span>
+      <span className="statusbar__cell statusbar__legal">
+        <a href="https://mouftools.com/privacy#monet" target="_blank" rel="noopener">
+          Privacy
+        </a>
+        ·
+        <a href="https://mouftools.com/terms#monet" target="_blank" rel="noopener">
+          Terms
+        </a>
       </span>
     </footer>
   );
